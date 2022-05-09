@@ -20,8 +20,11 @@ function mads(paraminit::AbstractVector, obstarget::AbstractVector, svrmodel::SV
 	end
 	Mads.mkdir(madsdir)
 	paraminitn, _ = NMFk.normalize(paraminit; amin=parammin, amax=parammax)
+	display(obstarget)
+	display(obsmin)
 	obstargetn, _ = NMFk.normalize(obstarget; amin=obsmin, amax=obsmax)
-	md = Mads.createproblem(vec(paraminitn), vec(obstargetn), svrpredict; problemname=joinpath(madsdir, "$(case)"), obstime=obstime, paramminorig=parammin, parammaxorig=parammax, obsminorig=obsmin, obsmaxorig=obsmax, kw...)
+	display(obstargetn)
+	md = Mads.createproblem(vec(paraminitn), (obstargetn), svrpredict; problemname=joinpath(madsdir, "$(case)"), obstime=obstime, paramminorig=parammin, parammaxorig=parammax, obsminorig=obsmin, obsmaxorig=obsmax, kw...)
 	@info("Model parameters:")
 	Mads.showallparameters(md)
 	@info("Model observations:")

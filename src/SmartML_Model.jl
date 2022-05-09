@@ -54,17 +54,19 @@ function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepca
 	return y_pr, pm, m
 end
 
-function model(Xo::AbstractMatrix, Xi::AbstractMatrix, keepcases::BitArray=falses(size(Xo, 1)), times::AbstractVector=Vector(undef, 0), Xtn::AbstractMatrix=Matrix(undef, 0, 0); modeltype::Symbol=:svr, ratio::Number=0, ptimes::Union{Vector{Integer},AbstractUnitRange}=1:length(times), plot::Bool=false, plottime::Bool=plot, mask=Colon(), kw...)
-	inan = vec(.!isnan.(Xo)) .|| vec(.!isnan.(sum(Xi, dims=2)))
+function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vector(undef, 0), Xtn::AbstractMatrix=Matrix(undef, 0, 0); keepcases::BitArray=falses(size(Xo, 1)), modeltype::Symbol=:svr, ratio::Number=0, ptimes::Union{Vector{Integer},AbstractUnitRange}=1:length(times), plot::Bool=false, plottime::Bool=false, mask=Colon(), kw...)
+	inan = vec(.!isnan.(sum(Xo; dims=2))) .|| vec(.!isnan.(sum(Xi; dims=2)))
 	Xon, Xomin, Xomax, Xob = NMFk.normalizematrix_col(Xo[inan,:])
 	Xin, Ximin, Ximax, Xib = NMFk.normalizematrix_col(Xi[inan,:])
 	ntimes = length(times)
 	ncases = size(Xin, 1)
 	if sizeof(Xtn) > 0
 		@assert size(Xtn, 1) == ntimes
-		T = setdata(Xin, [times Xtn]; mask=mask)
-	elseif length(times) > 0
-		T = setdata(Xin, times; mask=mask)
+		tn, tmin, tmax = NMFk.normalize(Float64.(times))
+		T = setdata(Xin, [tn Xtn]; mask=mask)
+	elseif ntimes > 0
+		tn, tmin, tmax = NMFk.normalize(Float64.(times))
+		T = setdata(Xin, tn; mask=mask)
 	else
 		@assert size(Xon, 2) == 1
 		T = Xin[mask,:]
@@ -74,8 +76,14 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, keepcases::BitArray=false
 		pm, lpm = setup_mask(ratio, keepcases, ncases, ntimes, ptimes)
 	else
 		vy_trn = vec(Xon)
-		pm = SVR.get_prediction_mask(length(vy_trn), ratio; keepcases=keepcases, debug=true)
+		pm = SVR.get_prediction_mask(length(vy_trn), ratio; keepcases=keepcases, debug=false)
 		lpm = pm
+	end
+	@info("Number of cases for training: $(ncases - sum(pm))")
+	@info("Number of cases for prediction: $(sum(pm))")
+	if ntimes > 0
+		@info("Number of cases/transients for training: $(ncases * ntimes - sum(lpm))")
+		@info("Number of cases/transients for prediction: $(sum(lpm))")
 	end
 	if modeltype == :svr
 		vy_prn, _, m = svrmodel(vy_trn, T; pm=lpm, kw...)
@@ -87,16 +95,28 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, keepcases::BitArray=false
 		@warn("Unknown model type! SVR will be used!")
 		vy_prn, _, m = svrmodel(vy_trn, T; pm=lpm, kw...)
 	end
-	vy_pr = NMFk.denormalize(vy_prn, Xomin, Xomax)
-	vy_tr = NMFk.denormalize(vy_trn, Xomin, Xomax)
-	function pimlmodel(X)
+	if ntimes > 0
+		vy_prn = reshape(vy_prn, ncases, ntimes)
+		vy_trn = reshape(vy_trn, ncases, ntimes)
+	else
+		vy_prn = reshape(vy_prn, ncases, 1)
+		vy_trn = reshape(vy_trn, ncases, 1)
+	end
+	vy_pr = vec(NMFk.denormalize(vy_prn, Xomin, Xomax))
+	vy_tr = vec(NMFk.denormalize(vy_trn, Xomin, Xomax))
+	function smartmlmodel(X)
 		nc = size(X, 1)
 		Xn, _, _, _ = NMFk.normalizematrix_col(X; amin=Ximin, amax=Ximax)
-		Yn = SVR.predict(m, Xn')
-		Y = NMFk.denormalize(Yn, Xomin, Xomax)
 		if ntimes > 0
-			Y = reshape(Y, nc, ntimes)
+			Yn = Matrix{Float64}(undef, nc, ntimes)
+			for t = 1:ntimes
+				S = [repeat(tn[t:t], nc) Xn]
+				Yn[:,t] = SVR.predict(m, S')
+			end
+			Y = NMFk.denormalize(Yn, Xomin, Xomax)
 		else
+			Yn = SVR.predict(m, Xn')
+			Y = NMFk.denormalize(Yn, Xomin, Xomax)
 			Y = reshape(Y, nc, 1)
 		end
 		return Y
@@ -116,10 +136,10 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, keepcases::BitArray=false
 	end
 	if plottime && ntimes > 0
 		for i = 1:ncases
-			Mads.plotseries(permutedims([Xon[i:ncases:end,:]; y_pr[i:ncases:end,:]]); xaxis=times, xmin=0, xmax=times[emd], logy=false, names=["Truth", "Prediction"])
+			Mads.plotseries(permutedims([Xo[i:ncases:end,:]; y_pr[i:ncases:end,:]]); xaxis=times, xmin=0, xmax=times[end], logy=false, names=["Truth", "Prediction"])
 		end
 	end
-	return pimlmodel, m, y_pr, T
+	return smartmlmodel, m, y_pr, T
 end
 
 function sensitivity(Xon::AbstractMatrix, Xin::AbstractMatrix, times::AbstractVector, keepcases::BitArray, attributes::AbstractVector; kw...)
