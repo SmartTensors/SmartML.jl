@@ -64,7 +64,7 @@ function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepca
 	return y_pr, pm, m
 end
 
-function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vector(undef, 0), Xtn::AbstractMatrix=Matrix(undef, 0, 0); keepcases::BitArray=falses(size(Xo, 1)), modeltype::Symbol=:svr, ratio::Number=0, ptimes::Union{Vector{Integer},AbstractUnitRange}=1:length(times), plot::Bool=false, plottime::Bool=false, mask=Colon(), load::Bool=false, save::Bool=false, dir::AbstractString="$(modeltype)", case::AbstractString="", filemodel::AbstractString="", kw...)
+function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vector(undef, 0), Xtn::AbstractMatrix=Matrix(undef, 0, 0); keepcases::BitArray=falses(size(Xo, 1)), modeltype::Symbol=:svr, ratio::Number=0, ptimes::Union{Vector{Integer},AbstractUnitRange}=1:length(times), plot::Bool=false, plottime::Bool=false, mask=Colon(), load::Bool=false, save::Bool=false, modeldir::AbstractString=joinpath(dir, "$(modeltype)"), case::AbstractString="", filemodel::AbstractString="", kw...)
 	inan = vec(.!isnan.(sum(Xo; dims=2))) .|| vec(.!isnan.(sum(Xi; dims=2)))
 	Xon, Xomin, Xomax, Xob = NMFk.normalizematrix_col(Xo[inan,:])
 	Xin, Ximin, Ximax, Xib = NMFk.normalizematrix_col(Xi[inan,:])
@@ -96,7 +96,7 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 		@info("Number of cases/transients for prediction: $(sum(lpm))")
 	end
 	if (load || save) && (filemodel != "" || case != "")
-		filemodel = joinpath(dir, "$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm)).$(modeltype)model")
+		filemodel = joinpath(modeldir, "$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm)).$(modeltype)model")
 	end
 	if modeltype == :svr
 		vy_prn, _, m = svrmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm, kw...)
