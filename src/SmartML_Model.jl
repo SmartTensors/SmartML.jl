@@ -36,7 +36,7 @@ function setup_mask(ratio::Number, keepcases::BitArray, ncases, ntimes, ptimes::
 	return pm, lpm
 end
 
-function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, epsilon::Float64=.000000001, gamma::Float64=0.1, check::Bool=false, kw...)
+function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, epsilon::Float64=.000000001, gamma::Float64=0.1, check::Bool=false, load::Bool=false, save::Bool=false, filemodel::AbstractString, kw...)
 	if pm === nothing
 		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)
 	else
@@ -44,17 +44,27 @@ function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepca
 		@assert eltype(pm) <: Bool
 	end
 	xt = permutedims(x)
-	m = SVR.train(y[.!pm], xt[:,.!pm]; epsilon=epsilon, gamma=gamma)
+	if load && isfile(filemodel)
+		@info("Loading model from file: $(filemodel)")
+		m = SVR.loadmodel(filemodel)
+	else
+		@info("Training ...")
+		m = SVR.train(y[.!pm], xt[:,.!pm]; epsilon=epsilon, gamma=gamma)
+		if save && filemodel != ""
+			@info("Saving model to file: $(filemodel)")
+			Mads.recursivemkdir(filemodel; filename=true)
+			SVR.savemodel(m, filemodel)
+		end
+	end
 	y_pr = SVR.predict(m, xt)
 	if check
 		y_pr2, _, _ = SVR.fit_test(y, xt; ratio=ratio, quiet=true, pm=pm, keepcases=keepcases, epsilon=epsilon, gamma=gamma, kw...)
 		@assert vy_pr == vy_pr2
 	end
-	y_pr[y_pr .< 0] .= 0
 	return y_pr, pm, m
 end
 
-function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vector(undef, 0), Xtn::AbstractMatrix=Matrix(undef, 0, 0); keepcases::BitArray=falses(size(Xo, 1)), modeltype::Symbol=:svr, ratio::Number=0, ptimes::Union{Vector{Integer},AbstractUnitRange}=1:length(times), plot::Bool=false, plottime::Bool=false, mask=Colon(), kw...)
+function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vector(undef, 0), Xtn::AbstractMatrix=Matrix(undef, 0, 0); keepcases::BitArray=falses(size(Xo, 1)), modeltype::Symbol=:svr, ratio::Number=0, ptimes::Union{Vector{Integer},AbstractUnitRange}=1:length(times), plot::Bool=false, plottime::Bool=false, mask=Colon(), load::Bool=false, save::Bool=false, dir::AbstractString="$(modeltype)", case::AbstractString="", filemodel::AbstractString="", kw...)
 	inan = vec(.!isnan.(sum(Xo; dims=2))) .|| vec(.!isnan.(sum(Xi; dims=2)))
 	Xon, Xomin, Xomax, Xob = NMFk.normalizematrix_col(Xo[inan,:])
 	Xin, Ximin, Ximax, Xib = NMFk.normalizematrix_col(Xi[inan,:])
@@ -85,15 +95,18 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 		@info("Number of cases/transients for training: $(ncases * ntimes - sum(lpm))")
 		@info("Number of cases/transients for prediction: $(sum(lpm))")
 	end
+	if (load || save) && (filemodel != "" || case != "")
+		filemodel = joinpath(dir, "$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm)).$(modeltype)model")
+	end
 	if modeltype == :svr
-		vy_prn, _, m = svrmodel(vy_trn, T; pm=lpm, kw...)
+		vy_prn, _, m = svrmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm, kw...)
 	elseif modeltype == :flux
-		vy_prn, _, m = fluxmodel(vy_trn, T; pm=lpm)
+		vy_prn, _, m = fluxmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm)
 	elseif modeltype == :piml
-		vy_prn, _, m = pimlmodel(vy_trn, T; pm=lpm)
+		vy_prn, _, m = pimlmodel(vy_trn, T;load=load, save=save, filemodel=filemodel, pm=lpm)
 	else
 		@warn("Unknown model type! SVR will be used!")
-		vy_prn, _, m = svrmodel(vy_trn, T; pm=lpm, kw...)
+		vy_prn, _, m = svrmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm, kw...)
 	end
 	if ntimes > 0
 		vy_prn = reshape(vy_prn, ncases, ntimes)
@@ -104,6 +117,17 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 	end
 	vy_pr = vec(NMFk.denormalize(vy_prn, Xomin, Xomax))
 	vy_tr = vec(NMFk.denormalize(vy_trn, Xomin, Xomax))
+	function madsmlmodel(x)
+		if ntimes > 0
+			y = Vector{Float64}(undef, ntimes)
+			for t = 1:ntimes
+				y[t] = first(SVR.predict(m, [tn[t]; x]))
+			end
+		else
+			y = SVR.predict(m, x)
+		end
+		return y
+	end
 	function smartmlmodel(X)
 		nc = size(X, 1)
 		Xn, _, _, _ = NMFk.normalizematrix_col(X; amin=Ximin, amax=Ximax)
@@ -139,7 +163,7 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 			Mads.plotseries(permutedims([Xo[i:ncases:end,:]; y_pr[i:ncases:end,:]]); xaxis=times, xmin=0, xmax=times[end], logy=false, names=["Truth", "Prediction"])
 		end
 	end
-	return smartmlmodel, m, y_pr, T
+	return smartmlmodel, madsmlmodel, m, y_pr, T
 end
 
 function sensitivity(Xon::AbstractMatrix, Xin::AbstractMatrix, times::AbstractVector, keepcases::BitArray, attributes::AbstractVector; kw...)

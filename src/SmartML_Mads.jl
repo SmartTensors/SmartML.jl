@@ -8,23 +8,11 @@ import Gadfly
 import JLD
 import Statistics
 
-function mads(paraminit::AbstractVector, obstarget::AbstractVector, svrmodel::SVR.svmmodel; paramkey::Union{Nothing,AbstractVector}=nothing, paramnames::Union{Nothing,AbstractVector}=nothing, parammin::AbstractArray=Vector{Float32}(undef, 0), parammax::AbstractArray=Vector{Float32}(undef, 0), obsmin::Union{Float64,AbstractArray}=Matrix(undef, 0, 0), obsmax::Union{Float64,AbstractArray}=Matrix(undef, 0, 0), obstime::Union{Nothing,AbstractVector}=nothing, case::AbstractString="case", madsdir::AbstractString=joinpath(SmartML.dir, "mads"), kw...)
-	if paramnames === nothing
-		paramnames = ["p$i" for i=1:length(paraminit)]
-	else
-		@assert length(paramnames) == length(paraminit)
-	end
-	function svrpredict(x::AbstractVector)
-		y = SVR.predict(svrmodel, x)
-		return y
-	end
+function mads(paraminit::AbstractVector, obstarget::AbstractVector, madsmodel::Function, case::AbstractString; parammin::AbstractArray=Vector{Float32}(undef, 0), parammax::AbstractArray=Vector{Float32}(undef, 0), obsmin::Union{Float64,AbstractArray}=Matrix(undef, 0, 0), obsmax::Union{Float64,AbstractArray}=Matrix(undef, 0, 0), obstime::Union{Nothing,AbstractVector}=nothing, madsdir::AbstractString=joinpath(SmartML.dir, "mads"), kw...)
 	Mads.mkdir(madsdir)
 	paraminitn, _ = NMFk.normalize(paraminit; amin=parammin, amax=parammax)
-	display(obstarget)
-	display(obsmin)
 	obstargetn, _ = NMFk.normalize(obstarget; amin=obsmin, amax=obsmax)
-	display(obstargetn)
-	md = Mads.createproblem(vec(paraminitn), (obstargetn), svrpredict; problemname=joinpath(madsdir, "$(case)"), obstime=obstime, paramminorig=parammin, parammaxorig=parammax, obsminorig=obsmin, obsmaxorig=obsmax, kw...)
+	md = Mads.createproblem(vec(paraminitn), (obstargetn), madsmodel; problemname=joinpath(madsdir, "$(case)"), paramminorig=parammin, parammaxorig=parammax, obstime=obstime, obsminorig=obsmin, obsmaxorig=obsmax, kw...)
 	@info("Model parameters:")
 	Mads.showallparameters(md)
 	@info("Model observations:")
@@ -41,20 +29,21 @@ function calibrate(aw...; random::Bool=true, reruns::Number=10, case::AbstractSt
 	return md, pe
 end
 
-function calibrate(md::AbstractDict; random::Bool=true, reruns::Number=10, case::AbstractString="case", kw...)
-	@info("History matching ...")
+function calibrate(md::AbstractDict; random::Bool=true, reruns::Number=10, kw...)
+	@info("Model calibration ...")
 	pe, optresults = random ? Mads.calibraterandom(md, reruns; first_init=true) : Mads.calibrate(md)
-	SmartML.calibrationresults(md, pe; case=case, kw...)
+	SmartML.calibrationresults(md, pe; kw...)
 	return pe
 end
 
-function calibrationresults(md::AbstractDict, pe::AbstractDict; madsdir::AbstractString=joinpath(dir, "mads"), case::AbstractString="case", f_calibrated_pi::AbstractString="", f_calibrated_parameters::AbstractString="", f_match::AbstractString="", parammin::AbstractArray=Vector{Float32}(undef, 0), parammax::AbstractArray=Vector{Float32}(undef, 0), plot::Bool=true)
+function calibrationresults(md::AbstractDict, pe::AbstractDict; madsdir::AbstractString=joinpath(dir, "mads"), case::AbstractString=Mads.getmadsrootname(md), f_calibrated_pi::AbstractString="", f_calibrated_parameters::AbstractString="", f_match::AbstractString="", parammin::AbstractArray=Vector{Float32}(undef, 0), parammax::AbstractArray=Vector{Float32}(undef, 0), plot::Bool=true, xtitle="", ytitle="")
 	f = Mads.forward(md, pe)
 	of = Mads.of(md, f)
+	@info("Model calibration OF (model discrepency): $(round(of; sigdigits=2))")
 	t = Mads.getobstime(md)
 	fp = joinpath(madsdir, "$(case)")
-	@info("History matching PI estimates are saved in $(f_calibrated_pi) ...")
 	f_calibrated_pi = setfilename(f_calibrated_pi, madsdir, fp, "_calibrated_targets.csv")
+	@info("Model calibration estimates are saved in $(f_calibrated_pi) ...")
 	DelimitedFiles.writedlm(f_calibrated_pi, [t collect(values(f))], ',')
 	pmax = Mads.getparamsmax(md)
 	pmin = Mads.getparamsmin(md)
@@ -80,18 +69,18 @@ function calibrationresults(md::AbstractDict, pe::AbstractDict; madsdir::Abstrac
 		pn = pe
 	end
 	f_calibrated_parameters = setfilename(f_calibrated_parameters, madsdir, fp, "_calibrated_parameters.csv")
-	@info("History matching parameter estimates are saved in $(f_calibrated_parameters) ...")
+	@info("Model calibration parameter estimates are saved in $(f_calibrated_parameters) ...")
 	DelimitedFiles.writedlm(f_calibrated_parameters, [collect(keys(pn)) collect(values(pn)) pmin pmax pmin.!=pmax], ',')
 	if plot
 		f_match = setfilename(f_match, madsdir, fp, "_match.png")
-		@info("History matching results are plotted in $(f_match) ...")
+		@info("Model calibration results are plotted in $(f_match) ...")
 		title = case != "" ? "Well: $(case) OF = $(round(of; sigdigits=2))" : "OF = $(round(of; sigdigits=2))"
-		Mads.plotmatches(md, pe; title=title, filename=f_match, pointsize=4Gadfly.pt, linewidth=4Gadfly.pt, xmin=0, xmax=maximum(t), xtitle="Time [days]", ytitle="PI")
+		Mads.plotmatches(md, pe; title=title, filename=f_match, pointsize=4Gadfly.pt, linewidth=4Gadfly.pt, xmin=0, xmax=maximum(t), xtitle=xtitle, ytitle=ytitle)
 	end
 end
 
-function emcee(md::AbstractDict=Dict(); parammin::AbstractArray=Vector{Float32}(undef, 0), parammax::AbstractArray=Vector{Float32}(undef, 0), madsdir::AbstractString=joinpath(dir, "mads"), case::AbstractString="", f_emcee_pi::AbstractString="", f_emcee_parameters::AbstractString="", f_emcee_parameters_mean::AbstractString="", f_emcee_parameters_jld::AbstractString="", f_emcee_scatter::AbstractString="", f_emcee_spaghetti::AbstractString="", f_emcee_best_worst::AbstractString="", f_emcee_p10_50_90::AbstractString="", ofmax::Number=Inf, nsteps=1000000, burnin=max(Int(nsteps/100), 100), thinning=max(Int(burnin/100), 10), numwalkers=thinning, load::Bool=true, save::Bool=true, plot::Bool=true, execute::Bool=true, best_worst::Integer=0)
-	case = case == "" ? "case" : case
+function emcee(md::AbstractDict=Dict(); parammin::AbstractArray=Vector{Float32}(undef, 0), parammax::AbstractArray=Vector{Float32}(undef, 0), madsdir::AbstractString=joinpath(dir, "mads"), case::AbstractString="", f_emcee_pi::AbstractString="", f_emcee_parameters::AbstractString="", f_emcee_parameters_mean::AbstractString="", f_emcee_parameters_jld::AbstractString="", f_emcee_scatter::AbstractString="", f_emcee_spaghetti::AbstractString="", f_emcee_best_worst::AbstractString="", f_emcee_p10_50_90::AbstractString="", ofmax::Number=Inf, nsteps=1000000, burnin=max(Int(nsteps/100), 100), thinning=max(Int(burnin/100), 10), numwalkers=thinning, load::Bool=true, save::Bool=true, plot::Bool=true, execute::Bool=true, best_worst::Integer=0, xtitle="", ytitle="")
+	case = case == "" ? Mads.getmadsrootname(md) : case
 	fp = joinpath(madsdir, "$(case)")
 	f_emcee_pi = setfilename(f_emcee_pi, madsdir, fp, "_emcee_pi.csv")
 	f_emcee_parameters = setfilename(f_emcee_parameters, madsdir, fp, "_emcee_parameters.csv")
@@ -117,6 +106,7 @@ function emcee(md::AbstractDict=Dict(); parammin::AbstractArray=Vector{Float32}(
 		@warn("AffineInvariantMCMC results file is missing $(f_emcee_parameters_jld)!")
 		return nothing, nothing, nothing
 	end
+	display(o)
 	t = Mads.getobstime(md)
 	DelimitedFiles.writedlm(f_emcee_pi, [t o], ',')
 	ofs = [Mads.of(md, o[:,i]) for i=1:size(o, 2)]
@@ -127,8 +117,10 @@ function emcee(md::AbstractDict=Dict(); parammin::AbstractArray=Vector{Float32}(
 	if length(paramkey[iopt]) != size(chain, 1)
 		@warn("The number of explored parameters do not match: $(length(paramkey[iopt])) vs. $(size(chain, 1))!")
 	end
- 	@info("Errors between AffineInvariantMCMC predictions and observations (lowest 10):")
+ 	@info("Errors between AffineInvariantMCMC predictions and observations (best 10):")
 	display(ofs[iofs][1:10])
+	@info("Errors between AffineInvariantMCMC predictions and observations (worst 10):")
+	display(ofs[iofs][end-10:end])
 	println()
 	sofs = ofs .< ofmax
 	if sum(sofs) > 0
@@ -146,11 +138,11 @@ function emcee(md::AbstractDict=Dict(); parammin::AbstractArray=Vector{Float32}(
 		else
 			@info("Plot AffineInvariantMCMC predictions with errors less than $(ofmax): $(sum(sofs)) out of $(length(ofs)) in total ...")
 		end
-		Mads.spaghettiplot(md, o[:, sofs]; filename=f_emcee_spaghetti, xmin=0, xmax=maximum(t), title=case, xtitle="Time [days]", ytitle="PI")
+		Mads.spaghettiplot(md, o[:, sofs]; filename=f_emcee_spaghetti, xmin=0, xmax=maximum(t), title=case, xtitle=xtitle, ytitle=ytitle)
 		if best_worst > 0
-			@info("Plot AffineInvariantMCMC best, PI-min PI-max predictions ...")
+			@info("Plot AffineInvariantMCMC best, min, and max predictions ...")
 			ibw = sortperm(vec(o[end,:]))
-			Mads.spaghettiplot(md, o[:, [iofs[1]..., ibw[best_worst]..., ibw[end - best_worst]...]]; filename=f_emcee_best_worst, xmin=0, xmax=maximum(t), title=case, xtitle="Time [days]", ytitle="PI", colors=["green"; repeat(["blue"], best_worst); repeat(["orange"], best_worst)])
+			Mads.spaghettiplot(md, o[:, [iofs[1]..., ibw[best_worst]..., ibw[end - best_worst]...]]; filename=f_emcee_best_worst, xmin=0, xmax=maximum(t), title=case, xtitle=xtitle, ytitle=ytitle, colors=["green"; repeat(["blue"], best_worst); repeat(["orange"], best_worst)])
 		end
 		@info("Plot AffineInvariantMCMC P10, P50, P90 predictions ...")
 		ostd = 1.28 .* Statistics.std(o; dims=2) .* ofs[iofs[1]]
@@ -158,7 +150,8 @@ function emcee(md::AbstractDict=Dict(); parammin::AbstractArray=Vector{Float32}(
 		p10 = omean .- ostd
 		p10[p10 .< 0] .= 0
 		p90 = omean .+ ostd
-		Mads.spaghettiplot(md, [omean p10 p90]; filename=f_emcee_p10_50_90, xmin=0, xmax=maximum(t), title=case, xtitle="Time [days]", ytitle="PI", colors=["green", "blue", "orange"])
+		display(omean)
+		Mads.spaghettiplot(md, [omean p10 p90]; filename=f_emcee_p10_50_90, xmin=0, xmax=maximum(t), title=case, xtitle=xtitle, ytitle=ytitle, colors=["green", "blue", "orange"], )
 	end
 	chain_orig = copy(chain)
 	if size(parammin, 2) == length(ptype) && size(chain, 1) == sum(iopt)
