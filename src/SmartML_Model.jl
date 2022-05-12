@@ -117,18 +117,24 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 	end
 	vy_pr = vec(NMFk.denormalize(vy_prn, Xomin, Xomax))
 	vy_tr = vec(NMFk.denormalize(vy_trn, Xomin, Xomax))
-	function madsmlmodel(x)
+	aimin = vec(Ximin)
+	aimax = vec(Ximax)
+	aomin = vec(Xomin)
+	aomax = vec(Xomax)
+	function mlmodel(x::AbstractVector)
+		xn = first(NMFk.normalize(x; amin=aimin, amax=aimax))
 		if ntimes > 0
 			y = Vector{Float64}(undef, ntimes)
 			for t = 1:ntimes
-				y[t] = first(SVR.predict(m, [tn[t]; x]))
+				y[t] = first(SVR.predict(m, [tn[t]; xn]))
 			end
 		else
-			y = SVR.predict(m, x)
+			y = SVR.predict(m, xn)
 		end
+		NMFk.denormalize!(y, aomin, aomax)
 		return y
 	end
-	function smartmlmodel(X)
+	function mlmodel(X::AbstractMatrix)
 		nc = size(X, 1)
 		Xn, _, _, _ = NMFk.normalizematrix_col(X; amin=Ximin, amax=Ximax)
 		if ntimes > 0
@@ -163,7 +169,7 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 			Mads.plotseries(permutedims([Xo[i:ncases:end,:]; y_pr[i:ncases:end,:]]); xaxis=times, xmin=0, xmax=times[end], logy=false, names=["Truth", "Prediction"])
 		end
 	end
-	return smartmlmodel, madsmlmodel, m, y_pr, T
+	return mlmodel, m, y_pr, T
 end
 
 function sensitivity(Xon::AbstractMatrix, Xin::AbstractMatrix, times::AbstractVector, keepcases::BitArray, attributes::AbstractVector; kw...)

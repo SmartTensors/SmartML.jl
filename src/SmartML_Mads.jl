@@ -10,9 +10,7 @@ import Statistics
 
 function mads(paraminit::AbstractVector, obstarget::AbstractVector, madsmodel::Function, case::AbstractString; parammin::AbstractArray=Vector{Float32}(undef, 0), parammax::AbstractArray=Vector{Float32}(undef, 0), obsmin::Union{Float64,AbstractArray}=Matrix(undef, 0, 0), obsmax::Union{Float64,AbstractArray}=Matrix(undef, 0, 0), obstime::Union{Nothing,AbstractVector}=nothing, madsdir::AbstractString=joinpath(SmartML.dir, "mads"), kw...)
 	Mads.mkdir(madsdir)
-	paraminitn, _ = NMFk.normalize(paraminit; amin=parammin, amax=parammax)
-	obstargetn, _ = NMFk.normalize(obstarget; amin=obsmin, amax=obsmax)
-	md = Mads.createproblem(vec(paraminitn), (obstargetn), madsmodel; problemname=joinpath(madsdir, "$(case)"), paramminorig=parammin, parammaxorig=parammax, obstime=obstime, obsminorig=obsmin, obsmaxorig=obsmax, kw...)
+	md = Mads.createproblem(paraminit, obstarget, madsmodel; problemname=joinpath(madsdir, "$(case)"), parammin=parammin, parammax=parammax, obstime=obstime, obsmin=obsmin, obsmax=obsmax, kw...)
 	@info("Model parameters:")
 	Mads.showallparameters(md)
 	@info("Model observations:")
@@ -106,7 +104,6 @@ function emcee(md::AbstractDict=Dict(); parammin::AbstractArray=Vector{Float32}(
 		@warn("AffineInvariantMCMC results file is missing $(f_emcee_parameters_jld)!")
 		return nothing, nothing, nothing
 	end
-	display(o)
 	t = Mads.getobstime(md)
 	DelimitedFiles.writedlm(f_emcee_pi, [t o], ',')
 	ofs = [Mads.of(md, o[:,i]) for i=1:size(o, 2)]
@@ -150,7 +147,6 @@ function emcee(md::AbstractDict=Dict(); parammin::AbstractArray=Vector{Float32}(
 		p10 = omean .- ostd
 		p10[p10 .< 0] .= 0
 		p90 = omean .+ ostd
-		display(omean)
 		Mads.spaghettiplot(md, [omean p10 p90]; filename=f_emcee_p10_50_90, xmin=0, xmax=maximum(t), title=case, xtitle=xtitle, ytitle=ytitle, colors=["green", "blue", "orange"], )
 	end
 	chain_orig = copy(chain)
