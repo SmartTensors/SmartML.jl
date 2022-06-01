@@ -2,10 +2,11 @@ import Flux
 import CUDA
 import Mads
 import Random
+import Gadfly
 import Cairo, Fontconfig
 
-Random.seed!(2022)
-r = rand(100)
+# Random.seed!(2022)
+# r = rand(100)
 f1(x) = (sin(x/10) / 2 + 0.5) / 5
 s1 = f1.(1:100)
 f2(x) = (exp(x/5) - 1 ) / 6e8
@@ -13,11 +14,11 @@ s2 = f2.(1:100)
 f3(x) = (sin(x) / 2 + 0.5) / 5
 s3 = f3.(1:100)
 
-Mads.plotseries([s1 s2 s3], "Original signals.png"; title="Original signals", name="Signal")
+Mads.plotseries([s1 s2 s3], joinpath(workdir, "figures", "Additive Original Equations.png"); hsize=12Gadfly.inch, title="Original Equations", name="Equation", xtitle="Time", ytitle="Value")
 
 y = s1 .+ s2 .+ s3
 
-Mads.plotseries(y, "Mixed signals.png"; title="Mixed signals", name="")
+Mads.plotseries(y, joinpath(workdir, "figures", "Additive Mixed Equations.png"); title="Mixed Equations", name="", xtitle="Time", ytitle="Value")
 
 function anal_model(p; v=1:100)
 	y = [f1.(v) f2.(v) f3.(v)] .* permutedims(p)
@@ -25,7 +26,7 @@ function anal_model(p; v=1:100)
 	return y
 end
 
-Mads.plotseries(anal_model([1,1,1]), "Mixed signals.png"; title="Mixed signals", name="")
+Mads.plotseries(anal_model(rand(3)), joinpath(workdir, "figures", "Additive Mixed Equations.png"); title="Mixed Equations", name="", xtitle="Time", ytitle="Value")
 
 function ml0_model(; input=3, output=100, v=1:output, device=Flux.gpu)
 	model = device(Flux.Chain(Flux.Dense(input, 3), Flux.Dense(3, output)))
@@ -71,10 +72,10 @@ end
 function getdata(args)
 	xtrain = rand(3, args.sizetrain)
 	ytrain = hcat([anal_model(xtrain[:,i]) for i=1:args.sizetrain]...)
-	Mads.plotseries(ytrain, "Training data.png"; title="Training data", name="")
+	Mads.plotseries(ytrain, joinpath(workdir, "figures", "Additive Training Data.png"); title="Training Data", name="", xtitle="Time", ytitle="Value")
 	xtest = rand(3, args.sizetest)
 	ytest = hcat([anal_model(xtest[:,i]) for i=1:args.sizetest]...)
-	Mads.plotseries(ytrain, "Testing data.png"; title="Testing data", name="")
+	Mads.plotseries(ytrain, joinpath(workdir, "figures", "Additive Testing Data.png"); title="Testing Data", name="", xtitle="Time", ytitle="Value")
 
 	train_loader = Flux.Data.DataLoader((xtrain, ytrain), batchsize=args.batchsize, shuffle=true)
 	test_loader = Flux.Data.DataLoader((xtest, ytest), batchsize=args.batchsize)
@@ -159,14 +160,18 @@ model1, train_loss1, test_loss1 = train(ml1_model)
 model2, train_loss2, test_loss2 = train(ml2_model)
 model3, train_loss3, test_loss3 = train(ml3_model)
 p = rand(3)
-Mads.plotseries([anal_model(p) model0(p) model1(p) model2(p) model3(p)], "Model comparisons.png"; names=["Truth", "ML", "PIML 1", "PIML 2", "PIML 3"], hsize=12Gadfly.inch)
-Mads.plotseries([train_loss0 train_loss1 train_loss2 train_loss3], "Model training.png"; names=["ML", "PIML 1", "PIML 2", "PIML 3"], hsize=12Gadfly.inch, logy=true)
-Mads.plotseries([test_loss0 test_loss1 test_loss2 test_loss3], "Model testing.png"; names=["ML", "PIML 1", "PIML 2", "PIML 3"], hsize=12Gadfly.inch, logy=true)
+Mads.plotseries([anal_model(p) model0(p) model1(p) model2(p) model3(p)], joinpath(workdir, "figures", "Additive Model Comparisons.png"); names=["Truth", "ML", "PIML 1", "PIML 2", "PIML 3"], hsize=12Gadfly.inch, truth=true, xtitle="Time", ytitle="Value")
+Mads.plotseries([anal_model(p) model0(p)], joinpath(workdir, "figures", "Additive Model Comparisons ML.png"); names=["Truth", "ML"], hsize=12Gadfly.inch, truth=true, xtitle="Time", ytitle="Value")
+Mads.plotseries([anal_model(p) model0(p) model2(p)], joinpath(workdir, "figures", "Additive Model Comparisons ML PIML.png"); names=["Truth", "ML", "PIML"], hsize=12Gadfly.inch, truth=true, xtitle="Time", ytitle="Value")
+Mads.plotseries([train_loss0 train_loss1 train_loss2 train_loss3], joinpath(workdir, "figures", "Additive Model Training.png"); names=["ML", "PIML 1", "PIML 2", "PIML 3"], hsize=12Gadfly.inch, logy=true, xtitle="Epoch", ytitle="Loss")
+Mads.plotseries([test_loss0 test_loss1 test_loss2 test_loss3], joinpath(workdir, "figures", "Additive Model Testing.png"); names=["ML", "PIML 1", "PIML 2", "PIML 3"], hsize=12Gadfly.inch, logy=true, xtitle="Epoch", ytitle="Loss")
 
 model1a, train_loss1a, test_loss1a = train(ml1a_model)
 model2a, train_loss2a, test_loss2a = train(ml2a_model)
 model3a, train_loss3a, test_loss3a = train(ml3a_model)
 p = rand(3)
-Mads.plotseries([anal_model(p) model0(p) model1a(p) model2a(p) model3a(p)], "Model A comparisons.png"; names=["Truth", "ML", "PIML 1", "PIML 2", "PIML 3"], hsize=12Gadfly.inch)
-Mads.plotseries([train_loss0 train_loss1a train_loss2a train_loss3a], "Model A training.png"; names=["ML", "PIML 1", "PIML 2", "PIML 3"], hsize=12Gadfly.inch, logy=true)
-Mads.plotseries([test_loss0 test_loss1a test_loss2a test_loss3a], "Model A testing.png"; names=["ML", "PIML 1", "PIML 2", "PIML 3"], hsize=12Gadfly.inch, logy=true)
+Mads.plotseries([anal_model(p) model0(p) model1a(p) model2a(p) model3a(p)], joinpath(workdir, "figures", "Additive Model A Comparisons.png"); names=["Truth", "ML", "PIML 1", "PIML 2", "PIML 3"], hsize=12Gadfly.inch, truth=true, xtitle="Time", ytitle="Value")
+Mads.plotseries([anal_model(p) model0(p)], joinpath(workdir, "figures", "Additive Model A Comparisons ML.png"); names=["Truth", "ML"], hsize=12Gadfly.inch, truth=true, xtitle="Time", ytitle="Value")
+Mads.plotseries([anal_model(p) model0(p) model2a(p)], joinpath(workdir, "figures", "Additive Model A Comparisons ML PIML.png"); names=["Truth", "ML", "PIML"], hsize=12Gadfly.inch, truth=true, xtitle="Time", ytitle="Value")
+Mads.plotseries([train_loss0 train_loss1a train_loss2a train_loss3a], joinpath(workdir, "figures", "Additive Model A Training.png"); names=["ML", "PIML 1", "PIML 2", "PIML 3"], hsize=12Gadfly.inch, logy=true, xtitle="Epoch", ytitle="Loss")
+Mads.plotseries([test_loss0 test_loss1a test_loss2a test_loss3a], joinpath(workdir, "figures", "Additive Model A Testing.png"); names=["ML", "PIML 1", "PIML 2", "PIML 3"], hsize=12Gadfly.inch, logy=true, xtitle="Epoch", ytitle="Loss")

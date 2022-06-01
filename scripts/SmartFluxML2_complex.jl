@@ -2,6 +2,7 @@ import Flux
 import CUDA
 import Mads
 import Random
+import Gadfly
 import Cairo, Fontconfig
 
 workdir = @show(@__DIR__)
@@ -15,67 +16,67 @@ s2 = f2(0)
 f3(x; v=1:100) = (sin.(v ./ (0.5 + x)) ./ 2 .+ 0.5) ./ 5
 s3 = f3(1)
 
-Mads.plotseries([s1 s2 s3], joinpath(workdir, "figures", "Complex Original Signals.png"); title="Original signals", name="Signal")
+Mads.plotseries([s1 s2 s3], joinpath(workdir, "figures", "Complex Original Equations.png"); hsize=12Gadfly.inch, title="Original Equations", name="Equation", xtitle="Time", ytitle="Value")
 
 y = s1 .+ s2 .+ s3
 
-Mads.plotseries(y, "Mixed signals.png"; title="Mixed signals", name="")
+Mads.plotseries(y, joinpath(workdir, "figures", "Complex Mixed Equations.png"); title="Mixed Equations", name="", xtitle="Time", ytitle="Value")
 
-function anal_model(p; v=1:100)
+function anal_model_c(p; v=1:100)
 	y = [f1(p[1]; v=v) f2(p[2]; v=v) f3(p[3]; v=v)]
 	y = vec(sum(y; dims=2))
 	return y
 end
 
-Mads.plotseries(anal_model([1,0,1]), joinpath(workdir, "figures", "Complex Mixed Signals.png"); title="Mixed signals", name="")
+Mads.plotseries(anal_model_c(rand(3)), joinpath(workdir, "figures", "Complex Mixed Equations.png"); title="Mixed Equations", name="", xtitle="Time", ytitle="Value")
 
-function ml0_model(; input=3, output=100, v=1:output, device=Flux.gpu)
+function ml0_model_c(; input=3, output=100, v=1:output, device=Flux.gpu)
 	model = device(Flux.Chain(Flux.Dense(input, 32), Flux.Dense(32, output)))
 	return model, Flux.params(model)
 end
 
-function ml1_model(; input=3, output=100, v=1:output, device=Flux.gpu)
+function ml1_model_c(; input=3, output=100, v=1:output, device=Flux.gpu)
 	model = device(Flux.Chain(Flux.SkipConnection(Flux.Chain(Flux.Dense(input, 32), Flux.Dense(32, output)), (x2, x)->(x2 .+ hcat(f1.(vec(x[1:1,:]); v=v)...)))))
 	return model, Flux.params(model)
 end
 
-function ml2_model(; input=3, output=100, v=1:output, device=Flux.gpu)
+function ml2_model_c(; input=3, output=100, v=1:output, device=Flux.gpu)
 	model = device(Flux.Chain(Flux.SkipConnection(Flux.Chain(Flux.Dense(input, 32), Flux.Dense(32, output)), (x2, x)->(x2 .+ hcat(f2.(vec(x[2:2,:]); v=v)...)))))
 	return model, Flux.params(model)
 end
 
-function ml3_model(; input=3, output=100, v=1:output, device=Flux.gpu)
+function ml3_model_c(; input=3, output=100, v=1:output, device=Flux.gpu)
 	model = device(Flux.Chain(Flux.SkipConnection(Flux.Chain(Flux.Dense(input, 32), Flux.Dense(32, output)), (x2, x)->(x2 .+ hcat(f3.(vec(x[3:3,:]); v=v)...)))))
 	return model, Flux.params(model)
 end
 
-function ml123_model(; input=3, output=100, v=1:output, device=Flux.gpu)
+function ml123_model_c(; input=3, output=100, v=1:output, device=Flux.gpu)
 	model = device(Flux.Chain(Flux.SkipConnection(Flux.Chain(Flux.Dense(input, 32), Flux.Dense(32, output)), (x2, x)->(x2 .+ hcat(f1.(vec(x[1:1,:]); v=v)...) .+ hcat(f2.(vec(x[2:2,:]); v=v)...) .+ hcat(f3.(vec(x[3:3,:]); v=v)...)))))
 	return model, Flux.params(model)
 end
 
-function ml1a_model(; input=3, output=100, v=1:output, device=Flux.gpu)
+function ml1a_model_c(; input=3, output=100, v=1:output, device=Flux.gpu)
 	d1 = device(Flux.Dense(input-1, 32))
 	d2 = device(Flux.Dense(32, output))
 	model = device(Flux.Chain(x->(x, d1(x[1:end-1,:])), ((x, x1)::Tuple)->(x, d2(x1)), ((x, x2)::Tuple)->(x2 .+ hcat(f1.(vec(x[1:1,:]); v=v)...))))
 	return model, Flux.params((d1, d2))
 end
 
-function ml2a_model(; input=3, output=100, v=1:output, device=Flux.gpu)
+function ml2a_model_c(; input=3, output=100, v=1:output, device=Flux.gpu)
 	d1 = device(Flux.Dense(input-1, 32))
 	d2 = device(Flux.Dense(32, output))
 	model = device(Flux.Chain(x->(x, d1(x[1:end-1,:])), ((x, x1)::Tuple)->(x, d2(x1)), ((x, x2)::Tuple)->(x2 .+ hcat(f2.(vec(x[2:2,:]); v=v)...))))
 	return model, Flux.params((d1, d2))
 end
 
-function ml3a_model(; input=3, output=100, v=1:output, device=Flux.gpu)
+function ml3a_model_c(; input=3, output=100, v=1:output, device=Flux.gpu)
 	d1 = device(Flux.Dense(input-1, 32))
 	d2 = device(Flux.Dense(32, output))
 	model = device(Flux.Chain(x->(x, d1(x[1:end-1,:])), ((x, x1)::Tuple)->(x, d2(x1)), ((x, x2)::Tuple)->(x2 .+ hcat(f3.(vec(x[3:3,:]); v=v)...))))
 	return model, Flux.params((d1, d2))
 end
 
-function ml123a_model(; input=3, output=100, v=1:output, device=Flux.gpu)
+function ml123a_model_c(; input=3, output=100, v=1:output, device=Flux.gpu)
 	d1 = device(Flux.Dense(input-1, 32))
 	d2 = device(Flux.Dense(32, output))
 	model = device(Flux.Chain(x->(x, d1(x[1:end-1,:])), ((x, x1)::Tuple)->(x, d2(x1)), ((x, x2)::Tuple)->(x2 .+ hcat(f1.(vec(x[1:1,:]); v=v)...) .+ hcat(f2.(vec(x[2:2,:]); v=v)...) .+ hcat(f3.(vec(x[3:3,:]); v=v)...))))
@@ -84,11 +85,11 @@ end
 
 function getdata(args)
 	xtrain = rand(3, args.sizetrain)
-	ytrain = hcat([anal_model(xtrain[:,i]) for i=1:args.sizetrain]...)
-	Mads.plotseries(ytrain, joinpath(workdir, "figures", "Complex Training Data.png"); title="Training Data", name="")
+	ytrain = hcat([anal_model_c(xtrain[:,i]) for i=1:args.sizetrain]...)
+	Mads.plotseries(ytrain, joinpath(workdir, "figures", "Complex Training Data.png"); title="Training Data", name="", xtitle="Time", ytitle="Value")
 	xtest = rand(3, args.sizetest)
-	ytest = hcat([anal_model(xtest[:,i]) for i=1:args.sizetest]...)
-	Mads.plotseries(ytrain, joinpath(workdir, "figures", "Complex Testing Data.png"); title="Testing Data", name="")
+	ytest = hcat([anal_model_c(xtest[:,i]) for i=1:args.sizetest]...)
+	Mads.plotseries(ytrain, joinpath(workdir, "figures", "Complex Testing Data.png"); title="Testing Data", name="", xtitle="Time", ytitle="Value")
 
 	train_loader = Flux.Data.DataLoader((xtrain, ytrain), batchsize=args.batchsize, shuffle=true)
 	test_loader = Flux.Data.DataLoader((xtest, ytest), batchsize=args.batchsize)
@@ -168,21 +169,26 @@ function train(ml_model; kws...)
 	return model, v_train_loss, v_test_loss
 end
 
-model0, train_loss0, test_loss0 = train(ml0_model)
-model1, train_loss1, test_loss1 = train(ml1_model)
-model2, train_loss2, test_loss2 = train(ml2_model)
-model3, train_loss3, test_loss3 = train(ml3_model)
-model123, train_loss123, test_loss123 = train(ml123_model)
+model_c0, train_loss_c0, test_loss_c0 = train(ml0_model_c)
+model_c1, train_loss_c1, test_loss_c1 = train(ml1_model_c)
+model_c2, train_loss_c2, test_loss_c2 = train(ml2_model_c)
+model_c3, train_loss_c3, test_loss_c3 = train(ml3_model_c)
+model_c123, train_loss_c123, test_loss_c123 = train(ml123_model_c)
 p = rand(3)
-Mads.plotseries([anal_model(p) model0(p) model1(p) model2(p) model3(p) model123(p)], joinpath(workdir, "figures", "Complex Model Comparisons.png"); names=["Truth", "ML", "PIML 1", "PIML 2", "PIML 3", "PIML 123"], hsize=12Gadfly.inch)
-Mads.plotseries([train_loss0 train_loss1 train_loss2 train_loss3 train_loss123], joinpath(workdir, "figures", "Complex Model Training.png"); names=["ML", "PIML 1", "PIML 2", "PIML 3", "PIML 123"], hsize=12Gadfly.inch, logy=true)
-Mads.plotseries([test_loss0 test_loss1 test_loss2 test_loss3 test_loss123], joinpath(workdir, "figures", "Complex Model Testing.png"); names=["ML", "PIML 1", "PIML 2", "PIML 3", "PIML 123"], hsize=12Gadfly.inch, logy=true)
+Mads.plotseries([anal_model_c(p) model_c0(p) model_c1(p) model_c2(p) model_c3(p) model_c123(p)], joinpath(workdir, "figures", "Complex Model Comparisons.png"); names=["Truth", "ML", "PIML 1", "PIML 2", "PIML 3", "PIML 123"], hsize=12Gadfly.inch, xtitle="Time", ytitle="Value", truth=true)
+Mads.plotseries([anal_model_c(p) model_c0(p)], joinpath(workdir, "figures", "Complex Model Comparisons ML.png"); names=["Truth", "ML"], hsize=12Gadfly.inch, xtitle="Time", ytitle="Value", truth=true)
+Mads.plotseries([anal_model_c(p) model_c0(p) model_c123(p)], joinpath(workdir, "figures", "Complex Model Comparisons ML PIML.png"); names=["Truth", "ML", "PIML"], hsize=12Gadfly.inch, xtitle="Time", ytitle="Value", truth=true)
+Mads.plotseries([anal_model_c(p) model_c0(p) model_c3(p)], joinpath(workdir, "figures", "Complex Model Comparisons ML PIML 2.png"); names=["Truth", "ML", "PIML"], hsize=12Gadfly.inch, xtitle="Time", ytitle="Value", truth=true)
+Mads.plotseries([train_loss_c0 train_loss_c1 train_loss_c2 train_loss_c3 train_loss_c123], joinpath(workdir, "figures", "Complex Model Training.png"); names=["ML", "PIML 1", "PIML 2", "PIML 3", "PIML 123"], hsize=12Gadfly.inch, logy=true, xtitle="Epoch", ytitle="Loss")
+Mads.plotseries([train_loss_c0 train_loss_c123], joinpath(workdir, "figures", "Complex Model Training PIML.png"); names=["ML", "PIML"], hsize=12Gadfly.inch, logy=true, xtitle="Epoch", ytitle="Loss")
+Mads.plotseries([test_loss_c0 test_loss_c1 test_loss_c2 test_loss_c3 test_loss_c123], joinpath(workdir, "figures", "Complex Model Testing.png"); names=["ML", "PIML 1", "PIML 2", "PIML 3", "PIML 123"], hsize=12Gadfly.inch, logy=true, xtitle="Epoch", ytitle="Loss")
+Mads.plotseries([test_loss_c0 test_loss_c123], joinpath(workdir, "figures", "Complex Model Testing PIML.png"); names=["ML", "PIML"], hsize=12Gadfly.inch, logy=true, xtitle="Epoch", ytitle="Loss")
 
-model1a, train_loss1a, test_loss1a = train(ml1a_model)
-model2a, train_loss2a, test_loss2a = train(ml2a_model)
-model3a, train_loss3a, test_loss3a = train(ml3a_model)
-model123a, train_loss123a, test_loss123a = train(ml123a_model)
+model_c1a, train_loss_c1a, test_loss_c1a = train(ml1a_model_c)
+model_c2a, train_loss_c2a, test_loss_c2a = train(ml2a_model_c)
+model_c3a, train_loss_c3a, test_loss_c3a = train(ml3a_model_c)
+model_c123a, train_loss_c123a, test_loss_c123a = train(ml123a_model_c)
 p = rand(3)
-Mads.plotseries([anal_model(p) model0(p) model1a(p) model2a(p) model3a(p) model123a(p)], joinpath(workdir, "figures", "Complex Model A Comparisons.png"); names=["Truth", "ML", "PIML 1", "PIML 2", "PIML 3", "PIML 123"], hsize=12Gadfly.inch, linestyle=[:dashed, :solid, :solid, :solid, :solid])
-Mads.plotseries([train_loss0 train_loss1a train_loss2a train_loss3a terain_loss123a], joinpath(workdir, "figures", "Complex Model A Training.png"); names=["ML", "PIML 1", "PIML 2", "PIML 3", "PIML 123"], hsize=12Gadfly.inch, logy=true)
-Mads.plotseries([test_loss0 test_loss1a test_loss2a test_loss3a test_loss123a], joinpath(workdir, "figures", "Complex Model A Testing.png"); names=["ML", "PIML 1", "PIML 2", "PIML 3", "PIML 123"], hsize=12Gadfly.inch, logy=true)
+Mads.plotseries([anal_model_c(p) model_c0(p) model_c1a(p) model_c2a(p) model_c3a(p) model_c123a(p)], joinpath(workdir, "figures", "Complex Model A Comparisons.png"); names=["Truth", "ML", "PIML 1", "PIML 2", "PIML 3", "PIML 123"], hsize=12Gadfly.inch, xtitle="Time", ytitle="Value", truth=true)
+Mads.plotseries([train_loss_c0 train_loss_c1a train_loss_c2a train_loss_c3a train_loss_c123a], joinpath(workdir, "figures", "Complex Model A Training.png"); names=["ML", "PIML 1", "PIML 2", "PIML 3", "PIML 123"], hsize=12Gadfly.inch, logy=true)
+Mads.plotseries([test_loss_c0 test_loss_c1a test_loss_c2a test_loss_c3a test_loss_c123a], joinpath(workdir, "figures", "Complex Model A Testing.png"); names=["ML", "PIML 1", "PIML 2", "PIML 3", "PIML 123"], hsize=12Gadfly.inch, logy=true)

@@ -2,6 +2,8 @@ import Flux
 import CUDA
 import MLDatasets
 
+workdir = @show(@__DIR__)
+
 function getdata(args, device)
 	# Loading Dataset
 	xtrain, ytrain = MLDatasets.MNIST.traindata(Float32)
@@ -41,6 +43,8 @@ function loss_and_accuracy(data_loader, model, device)
 end
 
 @Base.kwdef mutable struct Args
+	sizetrain = 500
+	sizetest = 500
 	η::Float64 = 3e-4       # learning rate
 	batchsize::Int = 256    # batch size
 	epochs::Int = 10        # number of epochs
@@ -73,7 +77,6 @@ function train(; kws...)
 	for epoch in 1:args.epochs
 		for (x, y) in train_loader
 			x, y = device(x), device(y) # transfer data to device
-			display(y)
 			gs = Flux.gradient(()->Flux.Losses.logitcrossentropy(model(x), y), ps) # compute gradient
 			Flux.Optimise.update!(opt, ps, gs) # update parameters
 		end
