@@ -165,6 +165,7 @@ Mads.plotseries([anal_model(p) model0(p)], joinpath(workdir, "figures", "Additiv
 Mads.plotseries([anal_model(p) model0(p) model2(p)], joinpath(workdir, "figures", "Additive Model Comparisons ML PIML.png"); names=["Truth", "ML", "PIML"], hsize=12Gadfly.inch, truth=true, xtitle="Time", ytitle="Value")
 Mads.plotseries([train_loss0 train_loss1 train_loss2 train_loss3], joinpath(workdir, "figures", "Additive Model Training.png"); names=["ML", "PIML 1", "PIML 2", "PIML 3"], hsize=12Gadfly.inch, logy=true, xtitle="Epoch", ytitle="Loss")
 Mads.plotseries([test_loss0 test_loss1 test_loss2 test_loss3], joinpath(workdir, "figures", "Additive Model Testing.png"); names=["ML", "PIML 1", "PIML 2", "PIML 3"], hsize=12Gadfly.inch, logy=true, xtitle="Epoch", ytitle="Loss")
+Mads.plotseries([test_loss0 test_loss2], joinpath(workdir, "figures", "Additive Model Testing ML PIML.png"); names=["ML", "PIML"], hsize=12Gadfly.inch, logy=true, xtitle="Epoch", ytitle="Loss")
 
 model1a, train_loss1a, test_loss1a = train(ml1a_model)
 model2a, train_loss2a, test_loss2a = train(ml2a_model)
