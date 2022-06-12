@@ -77,14 +77,13 @@ function getdata(args)
 	ytest = hcat([anal_model(xtest[:,i]) for i=1:args.sizetest]...)
 	Mads.plotseries(ytrain, joinpath(workdir, "figures", "Additive Testing Data.png"); title="Testing Data", name="", xtitle="Time", ytitle="Value")
 
-	train_loader = Flux.Data.DataLoader((xtrain, ytrain), batchsize=args.batchsize, shuffle=true)
-	test_loader = Flux.Data.DataLoader((xtest, ytest), batchsize=args.batchsize)
+	train_loader = Flux.Data.DataLoader((xtrain, ytrain); batchsize=args.batchsize, shuffle=true)
+	test_loader = Flux.Data.DataLoader((xtest, ytest); batchsize=args.batchsize)
 
 	return train_loader, test_loader
 end
 
 function loss(data_loader, model, device)
-	acc = 0
 	ls = 0.0f0
 	num = 0
 	for (x, y) in data_loader

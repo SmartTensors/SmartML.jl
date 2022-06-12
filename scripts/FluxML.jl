@@ -18,8 +18,8 @@ function getdata(args, device)
 	ytest = Flux.onehotbatch(ytest, 0:9)
 
 	# Create DataLoaders (mini-batch iterators)
-	train_loader = Flux.Data.DataLoader((xtrain, ytrain), batchsize=args.batchsize, shuffle=true)
-	test_loader = Flux.Data.DataLoader((xtest, ytest), batchsize=args.batchsize)
+	train_loader = Flux.Data.DataLoader((xtrain, ytrain); batchsize=args.batchsize, shuffle=true)
+	test_loader = Flux.Data.DataLoader((xtest, ytest); batchsize=args.batchsize)
 
 	return train_loader, test_loader
 end

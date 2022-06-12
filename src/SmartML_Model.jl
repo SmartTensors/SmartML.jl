@@ -95,6 +95,10 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 		@info("Number of cases/transients for training: $(ncases * ntimes - sum(lpm))")
 		@info("Number of cases/transients for prediction: $(sum(lpm))")
 	end
+	if plot && ntimes > 0
+		Mads.plotseries(Xo[.!pm,1:ntimes]; xmin=1, xmax=ntimes, title="Training set")
+		Mads.plotseries(Xo[pm,1:ntimes]; xmin=1, xmax=ntimes, title="Prediction set")
+	end
 	if (load || save) && (filemodel != "" || case != "")
 		filemodel = joinpath(modeldir, "$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm)).$(modeltype)model")
 	end
@@ -103,7 +107,7 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 	elseif modeltype == :flux
 		vy_prn, _, m = fluxmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm)
 	elseif modeltype == :piml
-		vy_prn, _, m = pimlmodel(vy_trn, T;load=load, save=save, filemodel=filemodel, pm=lpm)
+		vy_prn, _, m = pimlmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm)
 	else
 		@warn("Unknown model type! SVR will be used!")
 		vy_prn, _, m = svrmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm, kw...)
