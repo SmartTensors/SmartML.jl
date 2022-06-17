@@ -96,8 +96,10 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 		@info("Number of cases/transients for prediction: $(sum(lpm))")
 	end
 	if plot && ntimes > 0
-		Mads.plotseries(Xo[.!pm,1:ntimes]; xmin=1, xmax=ntimes, title="Training set")
-		Mads.plotseries(Xo[pm,1:ntimes]; xmin=1, xmax=ntimes, title="Prediction set")
+		Mads.plotseries(Xo[.!pm,1:ntimes]'; title="Training set")
+		if sum(pm) > 0
+			Mads.plotseries(Xo[pm,1:ntimes]'; title="Prediction set")
+		end
 	end
 	if (load || save) && (filemodel != "" || case != "")
 		filemodel = joinpath(modeldir, "$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm)).$(modeltype)model")
@@ -159,9 +161,11 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 	if plot
 		Mads.plotseries([vy_tr vy_pr]; xmin=1, xmax=length(vy_pr), logy=false, names=["Truth", "Prediction"])
 		NMFk.plotscatter(vy_tr[.!lpm], vy_pr[.!lpm]; title="Training Size: $(sum(.!pm)); r<sup>2</sup>: $(round(r2; sigdigits=2))")
+		println("Training r2 = $(round(r2; sigdigits=2))")
 	end
-	if sum(pm) > 0 || plot
+	if plot && sum(lpm) > 0
 		NMFk.plotscatter(vy_tr[lpm], vy_pr[lpm]; title="Prediction Size: $(sum(pm)); r<sup>2</sup>: $(round(r2; sigdigits=2))")
+		println("Prediction r2 = $(round(r2; sigdigits=2))")
 	end
 	if ntimes > 0
 		y_pr = reshape(vy_pr, ncases, ntimes)
