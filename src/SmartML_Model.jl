@@ -36,6 +36,34 @@ function setup_mask(ratio::Number, keepcases::BitArray, ncases, ntimes, ptimes::
 	return pm, lpm
 end
 
+function fluxmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, check::Bool=false, load::Bool=false, save::Bool=false, filemodel::AbstractString, kw...)
+	if pm === nothing
+		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)
+	else
+		@assert length(pm) == size(x, 1)
+		@assert eltype(pm) <: Bool
+	end
+	xt = permutedims(x)
+	if load && isfile(filemodel)
+		@info("Loading model from file: $(filemodel)")
+		m = flux_loadmodel(filemodel)
+	else
+		@info("Training ...")
+		m = flux_train(y[.!pm], xt[:,.!pm])
+		if save && filemodel != ""
+			@info("Saving model to file: $(filemodel)")
+			Mads.recursivemkdir(filemodel; filename=true)
+			flux_savemodel(m, filemodel)
+		end
+	end
+	y_pr = SVR.predict(m, xt)
+	if check
+		y_pr2, _, _ = flux_fit_test(y, xt; ratio=ratio, quiet=true, pm=pm, keepcases=keepcases, kw...)
+		@assert vy_pr == vy_pr2
+	end
+	return y_pr, pm, m
+end
+
 function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, epsilon::Float64=.000000001, gamma::Float64=0.1, check::Bool=false, load::Bool=false, save::Bool=false, filemodel::AbstractString, kw...)
 	if pm === nothing
 		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)

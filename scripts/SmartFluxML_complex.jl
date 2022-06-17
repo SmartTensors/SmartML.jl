@@ -89,7 +89,7 @@ function getdata(args)
 	Mads.plotseries(ytrain, joinpath(workdir, "figures", "Complex Training Data.png"); title="Training Data", name="", xtitle="Time", ytitle="Value")
 	xtest = rand(3, args.sizetest)
 	ytest = hcat([anal_model_c(xtest[:,i]) for i=1:args.sizetest]...)
-	Mads.plotseries(ytrain, joinpath(workdir, "figures", "Complex Testing Data.png"); title="Testing Data", name="", xtitle="Time", ytitle="Value")
+	Mads.plotseries(ytest, joinpath(workdir, "figures", "Complex Testing Data.png"); title="Testing Data", name="", xtitle="Time", ytitle="Value")
 
 	train_loader = Flux.Data.DataLoader((xtrain, ytrain); batchsize=args.batchsize, shuffle=true)
 	test_loader = Flux.Data.DataLoader((xtest, ytest); batchsize=args.batchsize)
