@@ -7,6 +7,7 @@ import CSV
 import JLD
 import DataFrames
 import NMFk
+import Mads
 import Gadfly
 import Cairo
 import Fontconfig
@@ -20,9 +21,9 @@ Genie.config.cors_headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,DELETE
 Genie.config.cors_allowed_origins = ["*"]
 
 datasetdir = joinpath(@__DIR__, "..", "gui-data")
-# data_global = CSV.read(joinpath(datasetdir, "rdataset_iris.csv"), DataFrames.DataFrame)
-# data_global.Cluster = repeat([-1], size(data_global, 1))
-# data_names = names(data_global)
+figuredir = joinpath(@__DIR__, "..", "gui-results")
+Mads.mkdir(datasetdir)
+Mads.mkdir(figuredir)
 
 @Stipple.reactive mutable struct DataModel <: Stipple.ReactiveModel
 	rerun::Stipple.R{Int} = 0
@@ -59,7 +60,13 @@ function load_data!(smarttensors_model::DataModel, filename)
 	else
 		f = filename[]
 	end
-	data_input = CSV.read(joinpath(datasetdir, f), DataFrames.DataFrame)
+	e = lowercase(last(splitext(f)))
+	@show e
+	if  e == "csv"
+		data_input = CSV.read(joinpath(datasetdir, f), DataFrames.DataFrame)
+	elseif e == "jld"
+		data_input = DataFrames.DataFrame(JLD.load(joinpath(datasetdir, f)))
+	end
 	smarttensors_model.attributes[] = names(data_input)
 	data_input.Cluster = repeat(["-"], size(data_input, 1))
 	smarttensors_model.datatable[] = StippleUI.DataTable(data_input)
@@ -98,6 +105,8 @@ function plot_data(smarttensors_model::DataModel, cluster_column::Symbol)
 			plot = StipplePlotly.PlotData(
 						x = x_attribute_collection,
 						y = y_attribute_collection,
+						xaxis = smarttensors_model.x_attribute[],
+						yaxis = smarttensors_model.y_attribute[],						
 						mode = "markers",
 						name = string(species),
 						plot = StipplePlotly.Charts.PLOT_TYPE_SCATTER)
@@ -108,6 +117,8 @@ function plot_data(smarttensors_model::DataModel, cluster_column::Symbol)
 		plot = StipplePlotly.PlotData(
 					x = df[!, Symbol(smarttensors_model.x_attribute[])],
 					y = df[!, Symbol(smarttensors_model.y_attribute[])],
+					xaxis = smarttensors_model.x_attribute[],
+					yaxis = smarttensors_model.y_attribute[],
 					mode = "markers",
 					marker = StipplePlotly.PlotDataMarker(color=z, colorscale="Viridis", size=14, colorbar=StipplePlotly.ColorBar(thickness=20)),
 					plot = StipplePlotly.Charts.PLOT_TYPE_SCATTER)
@@ -138,10 +149,10 @@ function compute_clusters!(smarttensors_model::DataModel)
 			l[ca .== i] .= "$(c)"
 		end
 	elseif m == "NMFk"
-		W, H, o, s, a = NMFk.execute(first(NMFk.normalizematrix_col(data)), smarttensors_model.no_of_clusters[], smarttensors_model.no_of_iterations[]; load=true, resultdir=joinpath(datasetdir, "..", "gui-results", p), casefilename=p)
+		W, H, o, s, a = NMFk.execute(first(NMFk.normalizematrix_col(data)), smarttensors_model.no_of_clusters[], smarttensors_model.no_of_iterations[]; load=true, resultdir=joinpath(figuredir, p), casefilename=p)
 		display(H)
 		display(n)
-		o, Wl, Hl = NMFk.postprocess(W, H, ["c$i" for i = 1:size(W, 1)], n; resultdir=joinpath(datasetdir, "..", "gui-results", p), figuredir=joinpath(datasetdir, "..", "gui-results", p))
+		o, Wl, Hl = NMFk.postprocess(W, H, ["c$i" for i = 1:size(W, 1)], n; resultdir=joinpath(figuredir, p), figuredir=joinpath(figuredir, p))
 		display(first(Wl))
 		l = first(Wl)
 	else
