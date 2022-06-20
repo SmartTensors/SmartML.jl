@@ -61,10 +61,9 @@ function load_data!(smarttensors_model::DataModel, filename)
 		f = filename[]
 	end
 	e = lowercase(last(splitext(f)))
-	@show e
-	if  e == "csv"
+	if  e == ".csv"
 		data_input = CSV.read(joinpath(datasetdir, f), DataFrames.DataFrame)
-	elseif e == "jld"
+	elseif e == ".jld"
 		data_input = DataFrames.DataFrame(JLD.load(joinpath(datasetdir, f)))
 	end
 	smarttensors_model.attributes[] = names(data_input)
@@ -75,8 +74,6 @@ end
 
 function plot_data(smarttensors_model::DataModel, cluster_column::Symbol)
 	plot_collection = Vector{StipplePlotly.PlotData}()
-	# @show isempty(smarttensors_model.x_attribute[])
-	# @show smarttensors_model.x_attribute[]
 	(isempty(smarttensors_model.x_attribute[]) || isempty(smarttensors_model.y_attribute[])) && return plot_collection
 
 	@info "Plotting data $(smarttensors_model.x_attribute[]), $(smarttensors_model.y_attribute[]), $(cluster_column)..."
@@ -104,26 +101,25 @@ function plot_data(smarttensors_model::DataModel, cluster_column::Symbol)
 			end
 			plot = StipplePlotly.PlotData(
 						x = x_attribute_collection,
-						y = y_attribute_collection,
-						xaxis = smarttensors_model.x_attribute[],
-						yaxis = smarttensors_model.y_attribute[],						
+						y = y_attribute_collection,					
 						mode = "markers",
 						name = string(species),
 						plot = StipplePlotly.Charts.PLOT_TYPE_SCATTER)
 			push!(plot_collection, plot)
 		end
-	else
+	else		
 		z = first(NMFk.normalize(df[!, Symbol(smarttensors_model.z_attribute[])]))
 		plot = StipplePlotly.PlotData(
 					x = df[!, Symbol(smarttensors_model.x_attribute[])],
 					y = df[!, Symbol(smarttensors_model.y_attribute[])],
-					xaxis = smarttensors_model.x_attribute[],
-					yaxis = smarttensors_model.y_attribute[],
 					mode = "markers",
 					marker = StipplePlotly.PlotDataMarker(color=z, colorscale="Viridis", size=14, colorbar=StipplePlotly.ColorBar(thickness=20)),
 					plot = StipplePlotly.Charts.PLOT_TYPE_SCATTER)
 		push!(plot_collection, plot)
 	end
+	smarttensors_model.layout[] = StipplePlotly.PlotLayout(plot_bgcolor = "#fff",
+	xaxis = [StipplePlotly.PlotLayoutAxis(xy = "x", index = 1, title = smarttensors_model.x_attribute[], ticks="outside", showline = false, zeroline = true)],
+	yaxis = [StipplePlotly.PlotLayoutAxis(xy = "y", index = 1, title = smarttensors_model.y_attribute[], ticks="outside", showline = false, zeroline = true)])	
 	return plot_collection
 end
 
@@ -269,16 +265,15 @@ function ui_smarttensors(smarttensors_model::DataModel)
 					Stipple.h6("Z attribute:")
 					Stipple.select(:z_attribute; options=:attributes)
 				])
-
 			])
 			Stipple.row([
 				Stipple.cell(class="st-module", [
 					Stipple.h5("Data:")
-					StipplePlotly.plot(:data_plot, layout=:layout, config="{displayLogo:false}")
+					StipplePlotly.plot(:data_plot; layout=:layout, config="{displayLogo:false}")
 				])
 				Stipple.cell(class="st-module", [
 					Stipple.h5("Extracted clusters:")
-					StipplePlotly.plot(:cluster_plot, layout = :layout, config = "{displayLogo:false}")
+					StipplePlotly.plot(:cluster_plot; layout=:layout, config="{displayLogo:false}")
 				])
 			])
 		]
