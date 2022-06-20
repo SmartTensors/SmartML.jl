@@ -5,6 +5,8 @@ import StippleUI
 import StipplePlotly
 import CSV
 import JLD
+import JLD2
+import FileIO
 import DataFrames
 import NMFk
 import Mads
@@ -63,8 +65,10 @@ function load_data!(smarttensors_model::DataModel, filename)
 	e = lowercase(last(splitext(f)))
 	if  e == ".csv"
 		data_input = CSV.read(joinpath(datasetdir, f), DataFrames.DataFrame)
+	elseif e == ".jld2"
+		data_input = FileIO.load(joinpath(datasetdir, f), "df")
 	elseif e == ".jld"
-		data_input = DataFrames.DataFrame(JLD.load(joinpath(datasetdir, f)))
+		data_input = JLD.load(joinpath(datasetdir, f), "df")
 	end
 	smarttensors_model.attributes[] = names(data_input)
 	data_input.Cluster = repeat(["-"], size(data_input, 1))
@@ -108,7 +112,7 @@ function plot_data(smarttensors_model::DataModel, cluster_column::Symbol)
 			push!(plot_collection, plot)
 		end
 	else		
-		z = first(NMFk.normalize(df[!, Symbol(smarttensors_model.z_attribute[])]))
+		z = df[!, Symbol(smarttensors_model.z_attribute[])]
 		plot = StipplePlotly.PlotData(
 					x = df[!, Symbol(smarttensors_model.x_attribute[])],
 					y = df[!, Symbol(smarttensors_model.y_attribute[])],
@@ -126,15 +130,24 @@ end
 function compute_clusters!(smarttensors_model::DataModel)
 	p =  first(splitext(last(splitdir(smarttensors_model.dataset[]))))
 	df = smarttensors_model.datatable[].data
-	m = Matrix(df)
-	# display(m)
-	use_columns = vec(sum(typeof.(m) .<: AbstractString; dims=1)) .== 0
+	use_columns = vec(sum(typeof.(Matrix(df)) .<: AbstractString; dims=1)) .== 0
 	# display(use_columns)
 	# display(smarttensors_model.attributes[])
-	n = smarttensors_model.attributes[][use_columns[1:end-1]]
+	data_columns = smarttensors_model.attributes[][use_columns[1:end-1]]
 	m = smarttensors_model.method[]
-	@info("Processing data attributes: $(n) using method $(m)... ")
-	data = float.(collect(Matrix(df[:, [Symbol(c) for c in n]])))
+	@info("Processing data attributes: $(data_columns) using method $(m)... ")
+	data = collect(Matrix(df[:, [Symbol(c) for c in data_columns]]))
+	label_columns = smarttensors_model.attributes[][.!use_columns[1:end-1]]
+	if length(label_columns) > 0
+		@info("Label attributes: $(label_columns)")
+		labels = string.(vec(collect(Matrix(df[:, [Symbol(c) for c in label_columns]]))))
+	else
+		labels = ["w$i" for i = 1:size(W, 1)]
+	end
+	@show labels
+	im = ismissing.(data)
+	data[im] .= NaN
+	data = float.(data)
 	if m == "k-means"
 		@info("Computing k-means clusters...")
 		result = Clustering.kmeans(permutedims(data), smarttensors_model.no_of_clusters[]; maxiter=smarttensors_model.no_of_iterations[])
@@ -146,10 +159,7 @@ function compute_clusters!(smarttensors_model::DataModel)
 		end
 	elseif m == "NMFk"
 		W, H, o, s, a = NMFk.execute(first(NMFk.normalizematrix_col(data)), smarttensors_model.no_of_clusters[], smarttensors_model.no_of_iterations[]; load=true, resultdir=joinpath(figuredir, p), casefilename=p)
-		display(H)
-		display(n)
-		o, Wl, Hl = NMFk.postprocess(W, H, ["c$i" for i = 1:size(W, 1)], n; resultdir=joinpath(figuredir, p), figuredir=joinpath(figuredir, p))
-		display(first(Wl))
+		o, Wl, Hl = NMFk.postprocess(W, H, labels, data_columns; Wcasefilename="locations", Hcasefilename="attributes", resultdir=joinpath(figuredir, p), figuredir=joinpath(figuredir, p))
 		l = first(Wl)
 	else
 		@warn("Unknown method $(m)!")
@@ -276,6 +286,11 @@ function ui_smarttensors(smarttensors_model::DataModel)
 					StipplePlotly.plot(:cluster_plot; layout=:layout, config="{displayLogo:false}")
 				])
 			])
+			# Stipple.row([
+			# 	Stipple.cell(class="st-module", [
+			# 		Stipple.img(src="http://smarttensors.com/logo/SmartTensorsNew.png", style="width:30px;height:30px;vertical-align:middle;margin-right:10px;")
+			# 	])
+			# ])
 		]
 	)
 end
