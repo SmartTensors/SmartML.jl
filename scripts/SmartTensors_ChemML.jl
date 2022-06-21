@@ -293,7 +293,7 @@ function ui_smarttensors(smarttensors_model::DataModel)
             ])
             Stipple.row([
                 Stipple.cell(class="st-module", [
-					Stipple.img(src="https://raw.githubusercontent.com/SmartTensors/SmartML.jl/main/gui-results/cr_bss_analysis_20160324/locations-3-labeled-sorted-dendrogram.png", style="width:800px;height:800px;vertical-align:middle;margin-right:10px;")
+					Stipple.img(src="https://raw.githubusercontent.com/SmartTensors/SmartML.jl/main/gui-results/cr_bss_analysis_20160324/locations-3-remappped-sorted-dendrogram.png", style="width:800px;height:800px;vertical-align:middle;margin-right:10px;")
 				])
 			])
 		]
