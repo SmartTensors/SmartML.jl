@@ -1,6 +1,10 @@
 import Mads
 import NMFk
 import SVR
+import ScikitLearn
+import XGBoost
+import PyCall
+xgb = PyCall.pyimport("xgboost")
 import Printf
 import Suppressor
 
@@ -59,6 +63,73 @@ function fluxmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepc
 	y_pr = SVR.predict(m, xt)
 	if check
 		y_pr2, _, _ = flux_fit_test(y, xt; ratio=ratio, quiet=true, pm=pm, keepcases=keepcases, kw...)
+		@assert vy_pr == vy_pr2
+	end
+	return y_pr, pm, m
+end
+
+function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, epsilon::Float64=.000000001, gamma::Float64=0.1, check::Bool=false, load::Bool=false, save::Bool=false, filemodel::AbstractString, kw...)
+	if pm === nothing
+		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)
+	else
+		@assert length(pm) == size(x, 1)
+		@assert eltype(pm) <: Bool
+	end
+	xt = permutedims(x)
+	if load && isfile(filemodel)
+		@info("Loading model from file: $(filemodel)")
+		m = SVR.loadmodel(filemodel)
+	else
+		@info("Training ...")
+		m = XGBoost.xgboost(permutedims(xt[:,.!pm]), 20; label=y[.!pm], verbose=1)
+		if save && filemodel != ""
+			@info("Saving model to file: $(filemodel)")
+			Mads.recursivemkdir(filemodel; filename=true)
+			XGBoost.save(filemodel, m)
+		end
+	end
+	y_pr = XGBoost.predict(m, permutedims(xt))
+	if check
+		y_pr2, _, _ = SVR.fit_test(y, xt; ratio=ratio, quiet=true, pm=pm, keepcases=keepcases, epsilon=epsilon, gamma=gamma, kw...)
+		@assert vy_pr == vy_pr2
+	end
+	return y_pr, pm, m
+end
+
+function xgbtmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, epsilon::Float64=.000000001, gamma::Float64=0.1, check::Bool=false, load::Bool=false, save::Bool=false, filemodel::AbstractString, kw...)
+	if pm === nothing
+		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)
+	else
+		@assert length(pm) == size(x, 1)
+		@assert eltype(pm) <: Bool
+	end
+	xt = permutedims(x)
+	if load && isfile(filemodel)
+		@info("Loading model from file: $(filemodel)")
+		xgb_model = SVR.loadmodel(filemodel)
+	else
+		@info("Training ...")
+		mod = xgb.XGBRegressor(seed = 20)
+		param_dict = Dict("max_depth"=>[3, 5, 6, 10, 15, 20],
+			"learning_rate"=>[0.01, 0.1, 0.2, 0.3],
+			"subsample"=>collect(0.5:0.1:1.0),
+			"colsample_bytree"=>collect(0.4:0.1:1.0),
+			"colsample_bylevel"=>collect(0.4:0.1:1.0),
+			"n_estimators"=>[100, 500, 1000])
+		model = ScikitLearn.GridSearch.RandomizedSearchCV(mod, param_dict; verbose=1, n_jobs=1, n_iter=10, cv=5)
+		ScikitLearn.fit!(model, permutedims(xt[:,.!pm]), y[.!pm])
+		xgb_model = model.best_estimator_
+		xgb_model.fit(xt[:,.!pm]), y[.!pm])
+		
+		if save && filemodel != ""
+			@info("Saving model to file: $(filemodel)")
+			Mads.recursivemkdir(filemodel; filename=true)
+			XGBoost.save(filemodel, xgb_model)
+		end
+	end
+	y_pr = xgb_model.predict(permutedims(xt))
+	if check
+		y_pr2, _, _ = SVR.fit_test(y, xt; ratio=ratio, quiet=true, pm=pm, keepcases=keepcases, epsilon=epsilon, gamma=gamma, kw...)
 		@assert vy_pr == vy_pr2
 	end
 	return y_pr, pm, m
@@ -134,6 +205,10 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 	end
 	if modeltype == :svr
 		vy_prn, _, m = svrmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm, kw...)
+	elseif modeltype == :xgb
+		vy_prn, _, m = xgbmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm)
+	elseif modeltype == :xgbt
+		vy_prn, _, m = xgbtmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm)		
 	elseif modeltype == :flux
 		vy_prn, _, m = fluxmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm)
 	elseif modeltype == :piml
@@ -149,6 +224,7 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 		vy_prn = reshape(vy_prn, ncases, 1)
 		vy_trn = reshape(vy_trn, ncases, 1)
 	end
+	vy_prn[vy_prn .< 0] .= 0
 	vy_pr = vec(NMFk.denormalize(vy_prn, Xomin, Xomax))
 	vy_tr = vec(NMFk.denormalize(vy_trn, Xomin, Xomax))
 	aimin = vec(Ximin)
