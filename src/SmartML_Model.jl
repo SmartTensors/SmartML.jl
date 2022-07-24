@@ -41,69 +41,40 @@ function setup_mask(ratio::Number, keepcases::BitArray, ncases, ntimes, ptimes::
 end
 
 function fluxmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, check::Bool=false, load::Bool=false, save::Bool=false, filemodel::AbstractString, kw...)
-	if pm === nothing
-		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)
-	else
-		@assert length(pm) == size(x, 1)
-		@assert eltype(pm) <: Bool
-	end
-	xt = permutedims(x)
-	if load && isfile(filemodel)
-		@info("Loading model from file: $(filemodel)")
-		m = flux_loadmodel(filemodel)
-	else
-		@info("Training ...")
-		m = flux_train(y[.!pm], xt[:,.!pm])
-		if save && filemodel != ""
-			@info("Saving model to file: $(filemodel)")
-			Mads.recursivemkdir(filemodel; filename=true)
-			flux_savemodel(m, filemodel)
-		end
-	end
-	y_pr = SVR.predict(m, xt)
-	if check
-		y_pr2, _, _ = flux_fit_test(y, xt; ratio=ratio, quiet=true, pm=pm, keepcases=keepcases, kw...)
-		@assert vy_pr == vy_pr2
-	end
-	return y_pr, pm, m
 end
 
-function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, epsilon::Float64=.000000001, gamma::Float64=0.1, check::Bool=false, load::Bool=false, save::Bool=false, filemodel::AbstractString, kw...)
+function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filemodel::AbstractString, kw...)
 	if pm === nothing
 		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)
 	else
 		@assert length(pm) == size(x, 1)
 		@assert eltype(pm) <: Bool
 	end
-	xt = permutedims(x)
 	if load && isfile(filemodel)
 		@info("Loading model from file: $(filemodel)")
 		m = SVR.loadmodel(filemodel)
 	else
 		@info("Training ...")
-		m = XGBoost.xgboost(permutedims(xt[:,.!pm]), 20; label=y[.!pm], verbose=1)
+		@show size(y)
+		@show size(y[.!pm])
+		m = XGBoost.xgboost(x[.!pm,:], 20; label=y[.!pm], verbose=0)
 		if save && filemodel != ""
 			@info("Saving model to file: $(filemodel)")
 			Mads.recursivemkdir(filemodel; filename=true)
 			XGBoost.save(filemodel, m)
 		end
 	end
-	y_pr = XGBoost.predict(m, permutedims(xt))
-	if check
-		y_pr2, _, _ = SVR.fit_test(y, xt; ratio=ratio, quiet=true, pm=pm, keepcases=keepcases, epsilon=epsilon, gamma=gamma, kw...)
-		@assert vy_pr == vy_pr2
-	end
+	y_pr = XGBoost.predict(m, x)
 	return y_pr, pm, m
 end
 
-function xgbtmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, epsilon::Float64=.000000001, gamma::Float64=0.1, check::Bool=false, load::Bool=false, save::Bool=false, filemodel::AbstractString, kw...)
+function xgbtmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filemodel::AbstractString, kw...)
 	if pm === nothing
 		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)
 	else
 		@assert length(pm) == size(x, 1)
 		@assert eltype(pm) <: Bool
 	end
-	xt = permutedims(x)
 	if load && isfile(filemodel)
 		@info("Loading model from file: $(filemodel)")
 		xgb_model = SVR.loadmodel(filemodel)
@@ -117,21 +88,16 @@ function xgbtmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepc
 			"colsample_bylevel"=>collect(0.4:0.1:1.0),
 			"n_estimators"=>[100, 500, 1000])
 		model = ScikitLearn.GridSearch.RandomizedSearchCV(mod, param_dict; verbose=1, n_jobs=1, n_iter=10, cv=5)
-		ScikitLearn.fit!(model, permutedims(xt[:,.!pm]), y[.!pm])
+		ScikitLearn.fit!(model, xt[.!pm,:], y[.!pm])
 		xgb_model = model.best_estimator_
-		xgb_model.fit(xt[:,.!pm]), y[.!pm])
-		
+		xgb_model.fit(xt[.!pm,:], y[.!pm])
 		if save && filemodel != ""
 			@info("Saving model to file: $(filemodel)")
 			Mads.recursivemkdir(filemodel; filename=true)
 			XGBoost.save(filemodel, xgb_model)
 		end
 	end
-	y_pr = xgb_model.predict(permutedims(xt))
-	if check
-		y_pr2, _, _ = SVR.fit_test(y, xt; ratio=ratio, quiet=true, pm=pm, keepcases=keepcases, epsilon=epsilon, gamma=gamma, kw...)
-		@assert vy_pr == vy_pr2
-	end
+	y_pr = xgb_model.predict(xt)
 	return y_pr, pm, m
 end
 
