@@ -3,7 +3,6 @@ import CUDA
 import Mads
 import Random
 import Gadfly
-import Cairo, Fontconfig
 
 workdir = @show(@__DIR__)
 

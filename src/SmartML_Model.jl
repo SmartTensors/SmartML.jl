@@ -88,17 +88,17 @@ function xgbtmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepc
 			"colsample_bylevel"=>collect(0.4:0.1:1.0),
 			"n_estimators"=>[100, 500, 1000])
 		model = ScikitLearn.GridSearch.RandomizedSearchCV(mod, param_dict; verbose=1, n_jobs=1, n_iter=10, cv=5)
-		ScikitLearn.fit!(model, xt[.!pm,:], y[.!pm])
+		ScikitLearn.fit!(model, x[.!pm,:], y[.!pm])
 		xgb_model = model.best_estimator_
-		xgb_model.fit(xt[.!pm,:], y[.!pm])
+		xgb_model.fit(x[.!pm,:], y[.!pm])
 		if save && filemodel != ""
 			@info("Saving model to file: $(filemodel)")
 			Mads.recursivemkdir(filemodel; filename=true)
 			XGBoost.save(filemodel, xgb_model)
 		end
 	end
-	y_pr = xgb_model.predict(xt)
-	return y_pr, pm, m
+	y_pr = xgb_model.predict(x)
+	return y_pr, pm, xgb_model
 end
 
 function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, epsilon::Float64=.000000001, gamma::Float64=0.1, check::Bool=false, load::Bool=false, save::Bool=false, filemodel::AbstractString, kw...)

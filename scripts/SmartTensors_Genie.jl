@@ -11,8 +11,6 @@ import DataFrames
 import NMFk
 import Mads
 import Gadfly
-import Cairo
-import Fontconfig
 import Colors
 import ColorSchemes
 import Clustering

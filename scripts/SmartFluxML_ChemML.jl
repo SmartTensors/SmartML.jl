@@ -3,8 +3,6 @@ import CUDA
 import Mads
 import Random
 import Gadfly
-import Cairo
-import Fontconfig
 
 function ml0_model(; input=3, output=100, device=Flux.gpu)
 	model = device(Flux.Chain(Flux.Dense(input, 64), Flux.Dense(64, output)))
