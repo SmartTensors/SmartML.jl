@@ -4,7 +4,6 @@ import SVR
 import ScikitLearn
 import XGBoost
 import PyCall
-xgb = PyCall.pyimport("xgboost")
 import Printf
 import Suppressor
 
@@ -55,9 +54,19 @@ function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepca
 		m = SVR.loadmodel(filemodel)
 	else
 		@info("Training ...")
-		@show size(y)
-		@show size(y[.!pm])
-		m = XGBoost.xgboost(x[.!pm,:], 20; label=y[.!pm], verbose=0)
+		param_dict = Dict(:max_depth=>20,
+		:base_score=>0.5,
+		:learning_rate=>0.3,
+		:subsample=>1.0,
+		:colsample_bynode=>1.0,
+		:colsample_bytree=>0.9,
+		:colsample_bylevel=>0.6,
+		:seed=>14,
+		:min_child_weight=>1,
+		:reg_alpha=>0,
+		:reg_lambda=>1,
+		:n_estimators=>1000)
+		m = XGBoost.xgboost(x[.!pm,:], 20; label=y[.!pm], verbose=0, silent=1, param_dict...)
 		if save && filemodel != ""
 			@info("Saving model to file: $(filemodel)")
 			Mads.recursivemkdir(filemodel; filename=true)
@@ -80,7 +89,8 @@ function xgbtmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepc
 		xgb_model = SVR.loadmodel(filemodel)
 	else
 		@info("Training ...")
-		mod = xgb.XGBRegressor(seed = 20)
+		xgb = PyCall.pyimport("xgboost")
+		mod = xgb.XGBRegressor(seed=20)
 		param_dict = Dict("max_depth"=>[3, 5, 6, 10, 15, 20],
 			"learning_rate"=>[0.01, 0.1, 0.2, 0.3],
 			"subsample"=>collect(0.5:0.1:1.0),
