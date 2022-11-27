@@ -7,25 +7,29 @@ import PyCall
 import Printf
 import Suppressor
 
-function setdata(Xin::AbstractMatrix, Xt::AbstractMatrix; order=Colon(), mask=Colon())
+function setdata(Xin::AbstractMatrix, Xt::AbstractMatrix; order=Colon(), mask=Colon(), quiet::Bool=false)
 	ntimes = size(Xt, 1)
 	ncases = size(Xin, 1)
 	T = [repeat(Xt; inner=(ncases, 1)) repeat(Xin[order,mask], ntimes)]
-	@info("Number of training cases: $(ncases)")
-	@info("Number of training times: $(ntimes)")
-	@info("Number of training cases * times: $(size(T, 1))")
-	@info("Number of training parameters: $(size(T, 2))")
+	if !quiet
+		@info("Number of training cases: $(ncases)")
+		@info("Number of training times: $(ntimes)")
+		@info("Number of training cases * times: $(size(T, 1))")
+		@info("Number of training parameters: $(size(T, 2))")
+	end
 	return T
 end
 
-function setdata(Xin::AbstractMatrix, times::AbstractVector; order=Colon(), mask=Colon())
+function setdata(Xin::AbstractMatrix, times::AbstractVector; order=Colon(), mask=Colon(), quiet::Bool=false)
 	ntimes = length(times)
 	ncases = size(Xin, 1)
 	T = [repeat(times; inner=ncases) repeat(Xin[order,mask], ntimes)]
-	@info("Number of training cases: $(ncases)")
-	@info("Number of training times: $(ntimes)")
-	@info("Number of training cases * times: $(size(T, 1))")
-	@info("Number of training parameters: $(size(T, 2))")
+	if !quiet
+		@info("Number of training cases: $(ncases)")
+		@info("Number of training times: $(ntimes)")
+		@info("Number of training cases * times: $(size(T, 1))")
+		@info("Number of training parameters: $(size(T, 2))")
+	end
 	return T
 end
 
@@ -39,10 +43,10 @@ function setup_mask(ratio::Number, keepcases::BitArray, ncases, ntimes, ptimes::
 	return pm, lpm
 end
 
-function fluxmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, check::Bool=false, load::Bool=false, save::Bool=false, filemodel::AbstractString, kw...)
+function fluxmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, check::Bool=false, load::Bool=false, save::Bool=false, filemodel::AbstractString, quiet::Bool=false, kw...)
 end
 
-function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filemodel::AbstractString, kw...)
+function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filemodel::AbstractString, quiet::Bool=false, kw...)
 	if pm === nothing
 		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)
 	else
@@ -53,15 +57,28 @@ function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepca
 		@info("Loading model from file: $(filemodel)")
 		model = SVR.loadmodel(filemodel)
 	else
-		@info("Training ...")
+		!quiet && @info("Training ...")
+		# XGBRegressor(base_score=0.5, booster='gbtree', colsample_bylevel=0.6,
+			#  colsample_bynode=1, colsample_bytree=0.9, enable_categorical=False,
+			#  gamma=0, gpu_id=-1, importance_type=None,
+			#  interaction_constraints='', learning_rate=0.3, max_delta_step=0,
+			#  max_depth=20, min_child_weight=1, missing=nan,
+			#  monotone_constraints='()', n_estimators=1000, n_jobs=16,
+			#  num_parallel_tree=1, predictor='auto', random_state=20,
+			#  reg_alpha=0, reg_lambda=1, scale_pos_weight=1, seed=20,
+			#  subsample=1.0, tree_method='exact', validate_parameters=1,
+			#  verbosity=None)
 		param_dict = Dict(:max_depth=>20,
 		:base_score=>0.5,
 		:learning_rate=>0.3,
+		:scale_pos_weight=>1,
+		:gamma=>0,
+		:max_delta_step=>0,
 		:subsample=>1.0,
 		:colsample_bynode=>1.0,
 		:colsample_bytree=>0.9,
 		:colsample_bylevel=>0.6,
-		:seed=>14,
+		:seed=>20,
 		:min_child_weight=>1,
 		:reg_alpha=>0,
 		:reg_lambda=>1,
@@ -77,7 +94,7 @@ function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepca
 	return y_pr, pm, model
 end
 
-function xgbpymodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filemodel::AbstractString, kw...)
+function xgbpymodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filemodel::AbstractString, quiet::Bool=false, kw...)
 	if pm === nothing
 		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)
 	else
@@ -88,7 +105,7 @@ function xgbpymodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keep
 		@info("Loading model from file: $(filemodel)")
 		xgb_model = SVR.loadmodel(filemodel)
 	else
-		@info("Training ...")
+		!quiet && @info("Training ...")
 		xgb = PyCall.pyimport("xgboost")
 		mod = xgb.XGBRegressor(seed=20)
 		param_dict = Dict("max_depth"=>[3, 5, 6, 10, 15, 20],
@@ -111,7 +128,7 @@ function xgbpymodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keep
 	return y_pr, pm, xgb_model
 end
 
-function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, epsilon::Float64=.000000001, gamma::Float64=0.1, check::Bool=false, load::Bool=false, save::Bool=false, filemodel::AbstractString, kw...)
+function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, epsilon::Float64=.000000001, gamma::Float64=0.1, check::Bool=false, load::Bool=false, save::Bool=false, filemodel::AbstractString, quiet::Bool=false, kw...)
 	if pm === nothing
 		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)
 	else
@@ -123,10 +140,10 @@ function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepca
 		@info("Loading model from file: $(filemodel)")
 		model = SVR.loadmodel(filemodel)
 	else
-		@info("Training ...")
+		!quiet && @info("Training ...")
 		model = SVR.train(y[.!pm], xt[:,.!pm]; epsilon=epsilon, gamma=gamma)
 		if save && filemodel != ""
-			@info("Saving model to file: $(filemodel)")
+			!quiet && @info("Saving model to file: $(filemodel)")
 			Mads.recursivemkdir(filemodel; filename=true)
 			SVR.savemodel(model, filemodel)
 		end
@@ -139,7 +156,7 @@ function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepca
 	return y_pr, pm, model
 end
 
-function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vector(undef, 0), Xtn::AbstractMatrix=Matrix(undef, 0, 0); keepcases::BitArray=falses(size(Xo, 1)), modeltype::Symbol=:svr, ratio::Number=0, ptimes::Union{Vector{Integer},AbstractUnitRange}=1:length(times), plot::Bool=false, plottime::Bool=false, mask=Colon(), load::Bool=false, save::Bool=false, modeldir::AbstractString=joinpath(workingdir, "model_$(modeltype)"), plotdir::AbstractString=joinpath(workingdir, "figures_$(modeltype)"), case::AbstractString="", filemodel::AbstractString="", kw...)
+function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vector(undef, 0), Xtn::AbstractMatrix=Matrix(undef, 0, 0); keepcases::BitArray=falses(size(Xo, 1)), modeltype::Symbol=:svr, ratio::Number=0, ptimes::Union{Vector{Integer},AbstractUnitRange}=1:length(times), plot::Bool=false, plottime::Bool=false, mask=Colon(), load::Bool=false, save::Bool=false, modeldir::AbstractString=joinpath(workingdir, "model_$(modeltype)"), plotdir::AbstractString=joinpath(workingdir, "figures_$(modeltype)"), case::AbstractString="", filemodel::AbstractString="", quiet::Bool=false, kw...)
 	inan = vec(.!isnan.(sum(Xo; dims=2))) .|| vec(.!isnan.(sum(Xi; dims=2)))
 	Xon, Xomin, Xomax, Xob = NMFk.normalizematrix_col(Xo[inan,:])
 	Xin, Ximin, Ximax, Xib = NMFk.normalizematrix_col(Xi[inan,:])
@@ -148,10 +165,10 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 	if sizeof(Xtn) > 0
 		@assert size(Xtn, 1) == ntimes
 		tn, tmin, tmax = NMFk.normalize(Float64.(times))
-		T = setdata(Xin, [tn Xtn]; mask=mask)
+		T = setdata(Xin, [tn Xtn]; mask=mask, quiet=quiet)
 	elseif ntimes > 0
 		tn, tmin, tmax = NMFk.normalize(Float64.(times))
-		T = setdata(Xin, tn; mask=mask)
+		T = setdata(Xin, tn; mask=mask, quiet=quiet)
 	else
 		@assert size(Xon, 2) == 1
 		T = Xin[mask,:]
@@ -164,11 +181,13 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 		pm = SVR.get_prediction_mask(length(vy_trn), ratio; keepcases=keepcases, debug=false)
 		lpm = pm
 	end
-	@info("Number of cases for training: $(ncases - sum(pm))")
-	@info("Number of cases for prediction: $(sum(pm))")
-	if ntimes > 0
-		@info("Number of cases/transients for training: $(ncases * ntimes - sum(lpm))")
-		@info("Number of cases/transients for prediction: $(sum(lpm))")
+	if !quiet
+		@info("Number of cases for training: $(ncases - sum(pm))")
+		@info("Number of cases for prediction: $(sum(pm))")
+		if ntimes > 0
+			@info("Number of cases/transients for training: $(ncases * ntimes - sum(lpm))")
+			@info("Number of cases/transients for prediction: $(sum(lpm))")
+		end
 	end
 	if plot && ntimes > 0
 		Mads.plotseries(Xo[.!pm,1:ntimes]', "$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_training_series.png"; title="Training set ($(sum(.!pm)))", xaxis=times, xmin=0, xmax=times[end])
@@ -180,18 +199,18 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 		filemodel = joinpath(modeldir, "$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm)).$(modeltype)model")
 	end
 	if modeltype == :svr
-		vy_prn, _, model = svrmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm, kw...)
+		vy_prn, _, model = svrmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm, quiet=quiet, kw...)
 	elseif modeltype == :xgb
-		vy_prn, _, model = xgbmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm)
+		vy_prn, _, model = xgbmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm, quiet=quiet)
 	elseif modeltype == :xgbpy
-		vy_prn, _, model = xgbpymodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm)
+		vy_prn, _, model = xgbpymodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm, quiet=quiet)
 	elseif modeltype == :flux
-		vy_prn, _, model = fluxmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm)
+		vy_prn, _, model = fluxmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm, quiet=quiet)
 	elseif modeltype == :piml
-		vy_prn, _, model = pimlmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm)
+		vy_prn, _, model = pimlmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm, quiet=quiet)
 	else
 		@warn("Unknown model type! SVR will be used!")
-		vy_prn, _, model = svrmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm, kw...)
+		vy_prn, _, model = svrmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm, quiet=quiet, kw...)
 	end
 	if ntimes > 0
 		vy_prn = reshape(vy_prn, ncases, ntimes)
@@ -237,15 +256,26 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 		end
 		return Y
 	end
-	r2 = SVR.r2(vy_tr[.!lpm], vy_pr[.!lpm])
+	r2t = SVR.r2(vy_tr[.!lpm], vy_pr[.!lpm])
+	rmset = NMFk.rmsenan(vy_tr[.!lpm], vy_pr[.!lpm])
+	!quiet && println("Training $(ncases - sum(pm)) / $(sum(pm)) $(ratio) r2 = $(round(r2t; sigdigits=3)) rmse = $(round(rmset; sigdigits=3))")
+	if sum(lpm) > 0
+		r2p = SVR.r2(vy_tr[lpm], vy_pr[lpm])
+		rmsep = NMFk.rmsenan(vy_tr[lpm], vy_pr[lpm])
+		!quiet && println("Prediction $(ncases - sum(pm)) / $(sum(pm)) $(ratio) r2 = $(round(r2p; sigdigits=3)) rmse = $(round(rmsep; sigdigits=3))")
+	else
+		r2p = rmsep = NaN
+	end
+	if quiet
+		println("$(ncases - sum(pm)) / $(sum(pm)) $(ratio) $(r2t) $(r2p) $(rmset) $(rmsep)")
+	end
 	if plot
 		Mads.plotseries([vy_tr vy_pr], "$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_series.png"; xmin=1, xmax=length(vy_pr), logy=false, names=["Truth", "Prediction"])
-		NMFk.plotscatter(vy_tr[.!lpm], vy_pr[.!lpm]; title="Training Size: $(sum(.!pm)); r<sup>2</sup>: $(round(r2; sigdigits=2))", filename="$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_scatter_training.png")
-		println("Training r2 = $(round(r2; sigdigits=2))")
+		NMFk.plotscatter(vy_tr[.!lpm], vy_pr[.!lpm]; title="Training Size: $(sum(.!pm)); r<sup>2</sup>: $(round(r2t; sigdigits=3))", filename="$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_scatter_training.png")
+
 	end
 	if plot && sum(lpm) > 0
-		NMFk.plotscatter(vy_tr[lpm], vy_pr[lpm]; title="Prediction Size: $(sum(pm)); r<sup>2</sup>: $(round(r2; sigdigits=2))", filename="$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_scatter_prediction.png")
-		println("Prediction r2 = $(round(r2; sigdigits=2))")
+		NMFk.plotscatter(vy_tr[lpm], vy_pr[lpm]; title="Prediction Size: $(sum(pm)); r<sup>2</sup>: $(round(r2p; sigdigits=3))", filename="$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_scatter_prediction.png")
 	end
 	if ntimes > 0
 		y_pr = reshape(vy_pr, ncases, ntimes)
