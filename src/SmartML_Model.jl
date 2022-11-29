@@ -271,11 +271,11 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 	end
 	if plot
 		Mads.plotseries([vy_tr vy_pr], "$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_series.png"; xmin=1, xmax=length(vy_pr), logy=false, names=["Truth", "Prediction"])
-		NMFk.plotscatter(vy_tr[.!lpm], vy_pr[.!lpm]; title="Training Size: $(sum(.!pm)); r<sup>2</sup>: $(round(r2t; sigdigits=3))", filename="$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_scatter_training.png")
+		NMFk.plotscatter(vy_tr[.!lpm], vy_pr[.!lpm]; title="Training Size: $(sum(.!pm)); r<sup>2</sup>: $(round(r2t; sigdigits=3))", xtitle="True", ytitle="Estimate", filename="$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_scatter_training.png")
 
 	end
 	if plot && sum(lpm) > 0
-		NMFk.plotscatter(vy_tr[lpm], vy_pr[lpm]; title="Prediction Size: $(sum(pm)); r<sup>2</sup>: $(round(r2p; sigdigits=3))", filename="$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_scatter_prediction.png")
+		NMFk.plotscatter(vy_tr[lpm], vy_pr[lpm]; title="Prediction Size: $(sum(pm)); r<sup>2</sup>: $(round(r2p; sigdigits=3))", xtitle="True", ytitle="Estimate", filename="$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_scatter_prediction.png")
 	end
 	if ntimes > 0
 		y_pr = reshape(vy_pr, ncases, ntimes)
