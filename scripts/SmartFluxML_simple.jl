@@ -3,7 +3,6 @@ import CUDA
 import Mads
 import Random
 import Gadfly
-import Cairo, Fontconfig
 
 # Random.seed!(2022)
 # r = rand(100)
