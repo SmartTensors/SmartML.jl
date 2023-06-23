@@ -43,10 +43,10 @@ function setup_mask(ratio::Number, keepcases::BitArray, ncases, ntimes, ptimes::
 	return pm, lpm
 end
 
-function fluxmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, check::Bool=false, load::Bool=false, save::Bool=false, filemodel::AbstractString, quiet::Bool=false, kw...)
+function fluxmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, check::Bool=false, load::Bool=false, save::Bool=false, filemodel::AbstractString="", quiet::Bool=false, kw...)
 end
 
-function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filemodel::AbstractString, quiet::Bool=false, kw...)
+function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filemodel::AbstractString="", quiet::Bool=false, kw...)
 	if pm === nothing
 		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)
 	else
@@ -94,7 +94,7 @@ function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepca
 	return y_pr, pm, model
 end
 
-function xgbpymodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filemodel::AbstractString, quiet::Bool=false, kw...)
+function xgbpymodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filemodel::AbstractString="", quiet::Bool=false, kw...)
 	if pm === nothing
 		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)
 	else
@@ -128,7 +128,7 @@ function xgbpymodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keep
 	return y_pr, pm, xgb_model
 end
 
-function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, epsilon::Float64=.000000001, gamma::Float64=0.1, check::Bool=false, load::Bool=false, save::Bool=false, filemodel::AbstractString, quiet::Bool=false, kw...)
+function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, epsilon::Float64=.000000001, gamma::Float64=0.1, check::Bool=false, load::Bool=false, save::Bool=false, filemodel::AbstractString="", quiet::Bool=false, kw...)
 	if pm === nothing
 		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)
 	else
