@@ -54,11 +54,11 @@ function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepca
 		@assert eltype(pm) <: Bool
 	end
 	if load && isfile(filemodel)
-		@info("Loading model from file: $(filemodel)")
-		model = SVR.loadmodel(filemodel)
+		@info("Loading XGBoost model from file: $(filemodel)")
+		model = XGBoost.load(filemodel)
 	else
 		!quiet && @info("Training ...")
-		# XGBRegressor(base_score=0.5, booster='gbtree', colsample_bylevel=0.6,
+		# XGBRegressor(; base_score=0.5, booster='gbtree', colsample_bylevel=0.6,
 			#  colsample_bynode=1, colsample_bytree=0.9, enable_categorical=False,
 			#  gamma=0, gpu_id=-1, importance_type=None,
 			#  interaction_constraints='', learning_rate=0.3, max_delta_step=0,
@@ -69,20 +69,20 @@ function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepca
 			#  subsample=1.0, tree_method='exact', validate_parameters=1,
 			#  verbosity=None)
 		param_dict = Dict(:max_depth=>20,
-		:base_score=>0.5,
-		:learning_rate=>0.3,
-		:scale_pos_weight=>1,
-		:gamma=>0,
-		:max_delta_step=>0,
-		:subsample=>1.0,
-		:colsample_bynode=>1.0,
-		:colsample_bytree=>0.9,
-		:colsample_bylevel=>0.6,
-		:seed=>20,
-		:min_child_weight=>1,
-		:reg_alpha=>0,
-		:reg_lambda=>1,
-		:n_estimators=>1000)
+			:base_score=>0.5,
+			:learning_rate=>0.3,
+			:scale_pos_weight=>1,
+			:gamma=>0,
+			:max_delta_step=>0,
+			:subsample=>1.0,
+			:colsample_bynode=>1.0,
+			:colsample_bytree=>0.9,
+			:colsample_bylevel=>0.6,
+			:seed=>20,
+			:min_child_weight=>1,
+			:reg_alpha=>0,
+			:reg_lambda=>1,
+			:n_estimators=>1000)
 		model = XGBoost.xgboost(x[.!pm,:], 20; label=y[.!pm], verbose=0, silent=1, param_dict...)
 		if save && filemodel != ""
 			@info("Saving model to file: $(filemodel)")
@@ -102,8 +102,8 @@ function xgbpymodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keep
 		@assert eltype(pm) <: Bool
 	end
 	if load && isfile(filemodel)
-		@info("Loading model from file: $(filemodel)")
-		xgb_model = SVR.loadmodel(filemodel)
+		@info("Loading XGBoost model from file: $(filemodel)")
+		xgb_model = XGBoost.load(filemodel)
 	else
 		!quiet && @info("Training ...")
 		xgb = PyCall.pyimport("xgboost")
@@ -137,7 +137,7 @@ function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0., keepca
 	end
 	xt = permutedims(x)
 	if load && isfile(filemodel)
-		@info("Loading model from file: $(filemodel)")
+		@info("Loading SVR model from file: $(filemodel)")
 		model = SVR.loadmodel(filemodel)
 	else
 		!quiet && @info("Training ...")
