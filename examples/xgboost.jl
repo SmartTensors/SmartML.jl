@@ -3,6 +3,7 @@ import MLJXGBoostInterface
 import MLJLIBSVMInterface
 import XGBoost
 import CSV
+import JLD
 import DataFrames
 import NMFk
 import Mads
@@ -16,6 +17,9 @@ cd(@__DIR__)
 
 x = CSV.read("x.csv", DataFrames.DataFrame)
 y = CSV.read("y.csv", DataFrames.DataFrame)
+
+x = JLD.load("gimi-x.jld", "x")
+y = JLD.load("gimi-y.jld", "y")
 
 # Python ScikitLearn XGBoost
 PyCall.py"""
@@ -68,7 +72,7 @@ param_dict = Dict("max_depth"=>[3, 5, 6, 10, 15, 20],
 	"subsample"=>collect(0.5:0.1:1.0),
 	"colsample_bytree"=>collect(0.4:0.1:1.0),
 	"colsample_bylevel"=>collect(0.4:0.1:1.0),
-	"n_estimators"=>[100, 500, 1000])
+	"n_estimators"=>[100, 500, 1000]) # Crazy ScikitLearn API
 skl_model_xgb_self_training = ScikitLearn.GridSearch.RandomizedSearchCV(skl_model_xgb, param_dict; verbose=1, n_jobs=1, n_iter=25, cv=5)
 ScikitLearn.fit!(skl_model_xgb_self_training, Matrix(x), Matrix(y)[:,1])
 skl_model_xgb_best = skl_model_xgb_self_training.best_estimator_
@@ -77,7 +81,7 @@ y_pr = skl_model_xgb_best.predict(Matrix(x))
 NMFk.plotscatter(y_pr, Matrix(y)[:,1])
 
 # Julia XGBoost
-model = XGBoost.xgboost((Matrix(x), Matrix(y)[:,1]); XGBoost.regression(test = 1,
+xgb_model = XGBoost.xgboost((Matrix(x), Matrix(y)[:,1]); XGBoost.regression(test = 1,
 			num_round = 100,
 			booster = "gbtree",
 			disable_default_eval_metric = 0,
@@ -114,7 +118,7 @@ model = XGBoost.xgboost((Matrix(x), Matrix(y)[:,1]); XGBoost.regression(test = 1
 			base_score = 0.5,
 			importance_type = "gain",
 			validate_parameters = false)...)
-y_pr = XGBoost.predict(model, Matrix(x))
+y_pr = XGBoost.predict(xgb_model, Matrix(x))
 NMFk.plotscatter(y_pr, Matrix(y)[:,1])
 
 # MLJ XGBoost
@@ -126,24 +130,137 @@ r_eta = MLJ.range(xgbmodel, :eta; values=[0.01, 0.1, 0.2, 0.3])
 r_subsample = MLJ.range(xgbmodel, :subsample; values=collect(0.5:0.1:1.0))
 r_colsample_bytree = MLJ.range(xgbmodel, :colsample_bytree; values=collect(0.4:0.1:1.0))
 r_colsample_bylevel = MLJ.range(xgbmodel, :colsample_bylevel; values=collect(0.4:0.1:1.0))
-r_num_boost_round = MLJ.range(xgbmodel, :num_boost_round; values=[100, 500, 1000])
+r_num_round = MLJ.range(xgbmodel, :num_round; values=[100, 500, 1000])
 
-self_tuning_xgbmodel = MLJ.TunedModel(model=xgbmodel, resampling=MLJ.CV(nfolds=5), tuning=MLJ.RandomSearch(), range=[r_max_depth, r_eta, r_subsample, r_colsample_bytree, r_colsample_bylevel, r_num_boost_round], measure=MLJ.rms)
+self_tuning_xgbmodel = MLJ.TunedModel(model=xgbmodel, resampling=MLJ.CV(nfolds=5), tuning=MLJ.RandomSearch(), range=[r_max_depth, r_eta, r_subsample, r_colsample_bytree, r_colsample_bylevel, r_num_round], measure=MLJ.rms)
 
 xgb_machine = MLJ.machine(self_tuning_xgbmodel, MLJ.table(Matrix(x)), Matrix(y)[:,1])
 MLJ.fit!(xgb_machine; verbosity=1)
 
-y_pr = MLJ.predict(mach, MLJ.table(Matrix(x)))
+y_pr = MLJ.predict(xgb_machine, MLJ.table(Matrix(x)))
 NMFk.plotscatter(y_pr, Matrix(y)[:,1])
 
-MLJ.fitted_params(mach).best_model
+mlj_params = MLJ.fitted_params(xgb_machine).best_model
+xgbmodel_fit = XGBModel(  test = 1,
+num_round = 500,
+booster = "gbtree",
+disable_default_eval_metric = 0,
+eta = 0.3,
+num_parallel_tree = 1,
+gamma = 0.0,
+max_depth = 3,
+min_child_weight = 1.0,
+max_delta_step = 0.0,
+subsample = 1.0,
+colsample_bytree = 0.9,
+colsample_bylevel = 0.4,
+colsample_bynode = 1.0,
+lambda = 1.0,
+alpha = 0.0,
+tree_method = "auto",
+sketch_eps = 0.03,
+scale_pos_weight = 1.0,
+updater = nothing,
+refresh_leaf = 1,
+process_type = "default",
+grow_policy = "depthwise",
+max_leaves = 0,
+max_bin = 256,
+predictor = "cpu_predictor",
+sample_type = "uniform",
+normalize_type = "tree",
+rate_drop = 0.0,
+one_drop = 0,
+skip_drop = 0.0,
+feature_selector = "cyclic",
+top_k = 0,
+tweedie_variance_power = 1.5,
+objective = "reg:squarederror",
+base_score = 0.5,
+watchlist = nothing,
+nthread = 16,
+importance_type = "gain",
+seed = nothing,
+validate_parameters = false,
+eval_metric = String[])
+xgb_machine_fit = MLJ.machine(xgbmodel_fit, MLJ.table(Matrix(x)), Matrix(y)[:,1])
+MLJ.fit!(xgb_machine_fit; verbosity=1)
+y_pr = MLJ.predict(xgb_machine_fit, MLJ.table(Matrix(x)))
+NMFk.plotscatter(y_pr, Matrix(y)[:,1])
 
-mach = MLJ.machine(self_tuning_xgbmodel, MLJ.table(GIMI.X), GIMI.y)
-MLJ.fit!(mach; verbosity=1)
+mlj_xgb_model = XGBoost.xgboost((Matrix(x), Matrix(y)[:,1]); XGBoost.regression(
+	test = 1,
+	num_round = 500,
+	booster = "gbtree",
+	disable_default_eval_metric = 0,
+	eta = 0.3,
+	num_parallel_tree = 1,
+	gamma = 0.0,
+	max_depth = 3,
+	min_child_weight = 1.0,
+	max_delta_step = 0.0,
+	subsample = 1.0,
+	colsample_bytree = 0.9,
+	colsample_bylevel = 0.4,
+	colsample_bynode = 1.0,
+	lambda = 1.0,
+	alpha = 0.0,
+	tree_method = "auto",
+	sketch_eps = 0.03,
+	scale_pos_weight = 1.0,
 
-y_pr = MLJ.predict(mach, MLJ.table(Matrix(x)))
+	refresh_leaf = 1,
+	process_type = "default",
+	grow_policy = "depthwise",
+	max_leaves = 0,
+	max_bin = 256,
+	predictor = "cpu_predictor",
+	sample_type = "uniform",
+	normalize_type = "tree",
+	rate_drop = 0.0,
+	one_drop = 0,
+	skip_drop = 0.0,
+	feature_selector = "cyclic",
+	top_k = 0,
+	tweedie_variance_power = 1.5,
+	objective = "reg:squarederror",
+	base_score = 0.5,
+
+	nthread = 16,
+	importance_type = "gain",
+
+	validate_parameters = false,
+	eval_metric = String[])...)
+y_pr = XGBoost.predict(mlj_xgb_model, Matrix(x))
 NMFk.plotscatter(y_pr, Matrix(y)[:,1])
 
 # MLJ SVR
 SVRModel = MLJ.@load EpsilonSVR verbosity=1
 svrmodel = SVRModel()
+r_epsilon = MLJ.range(svrmodel, :epsilon; lower=1e-12, upper=1e12, scale=:log10)
+r_gamma = MLJ.range(svrmodel, :gamma; lower=1e-6, upper=1e6, scale=:log10)
+self_tuning_svrmodel = MLJ.TunedModel(model=svrmodel, resampling=MLJ.CV(nfolds=50), tuning=MLJ.Grid(), range=[r_epsilon, r_gamma], measure=MLJ.rms)
+svr_machine = MLJ.machine(self_tuning_svrmodel, MLJ.table(Matrix(x)), Matrix(y)[:,1])
+MLJ.fit!(svr_machine; verbosity=1)
+y_pr = MLJ.predict(svr_machine, MLJ.table(Matrix(x)))
+NMFk.plotscatter(y_pr, Matrix(y)[:,1])
+MLJ.fitted_params(svr_machine).best_model
+
+svrmodel_n = SVRModel(gamma = 0.01, epsilon = 1e-12)
+svr_machine_n = MLJ.machine(svrmodel_n, MLJ.table(Matrix(x)), Matrix(y)[:,1])
+MLJ.fit!(svr_machine_n; verbosity=1)
+y_pr = MLJ.predict(svr_machine_n, MLJ.table(Matrix(x)))
+NMFk.plotscatter(y_pr, Matrix(y)[:,1])
+
+xgbmodel_fit = XGBModel(test = 1, num_round = 1000, booster = "gbtree", disable_default_eval_metric = 0, eta = 0.5, num_parallel_tree = 1, gamma = 0.0, max_depth = 3, min_child_weight = 1.0, max_delta_step = 0.0, subsample = 1.0, colsample_bytree = 0.9, colsample_bylevel = 0.4, colsample_bynode = 1.0, lambda = 1.0, alpha = 0.0, tree_method = "auto", sketch_eps = 0.03, scale_pos_weight = 1.0, updater = nothing, refresh_leaf = 1, process_type = "default", grow_policy = "depthwise", max_leaves = 0, max_bin = 256, predictor = "cpu_predictor", sample_type = "uniform", normalize_type = "tree", rate_drop = 0.0, one_drop = 0, skip_drop = 0.0, feature_selector = "cyclic", top_k = 0, tweedie_variance_power = 1.5, objective = "reg:squarederror", base_score = 0.5, watchlist = nothing, nthread = 16, importance_type = "gain", seed = nothing, validate_parameters = false, eval_metric = String[])
+xgb_machine_fit = MLJ.machine(xgbmodel_fit, MLJ.table(x), y)
+MLJ.fit!(xgb_machine_fit; verbosity=1)
+y_pr = MLJ.predict(xgb_machine_fit, MLJ.table(x))
+NMFk.plotscatter(y_pr, y)
+
+svrmodel_n = SVRModel(; gamma=0.1, epsilon=0.000000001)
+svr_machine_n = MLJ.machine(svrmodel_n, MLJ.table(x), y)
+MLJ.fit!(svr_machine_n; verbosity=1)
+y_pr = MLJ.predict(svr_machine_n, MLJ.table(x))
+NMFk.plotscatter(y_pr, y)
+
