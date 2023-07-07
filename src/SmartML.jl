@@ -1,8 +1,9 @@
 module SmartML
 
-import SVR
-import NMFk
 import Mads
+import NMFk
+import MLJ
+import SVR
 import Printf
 import Suppressor
 
