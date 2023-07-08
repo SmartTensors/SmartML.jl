@@ -46,19 +46,19 @@ function setup_mask(ratio::Number, keepcases::BitArray, ncases, ntimes, ptimes::
 	return pm, lpm
 end
 
-function fluxmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, check::Bool=false, load::Bool=false, save::Bool=false, filemodel::AbstractString="", quiet::Bool=false, kw...)
+function fluxmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, check::Bool=false, load::Bool=false, save::Bool=false, filename::AbstractString="", quiet::Bool=false, kw...)
 end
 
-function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filemodel::AbstractString="", quiet::Bool=false, kw...)
+function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filename::AbstractString="", quiet::Bool=false, kw...)
 	if pm === nothing
 		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)
 	else
 		@assert length(pm) == size(x, 1)
 		@assert eltype(pm) <: Bool
 	end
-	if load && isfile(filemodel)
-		@info("Loading XGBoost model from file: $(filemodel)")
-		model = XGBoost.load(filemodel)
+	if load && isfile(filename)
+		@info("Loading XGBoost model from file: $(filename)")
+		model = XGBoost.load(filename)
 	else
 		!quiet && @info("Training ...")
 		param_dict = Dict(:max_depth => 20,
@@ -77,17 +77,17 @@ function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepc
 			:reg_lambda => 1,
 			:n_estimators => 1000)
 		model = XGBoost.xgboost(x[.!pm, :], 20; label=y[.!pm], verbose=0, silent=1, param_dict...)
-		if save && filemodel != ""
-			@info("Saving model to file: $(filemodel)")
-			Mads.recursivemkdir(filemodel; filename=true)
-			XGBoost.save(filemodel, model)
+		if save && filename != ""
+			@info("Saving model to file: $(filename)")
+			Mads.recursivemkdir(filename; filename=true)
+			XGBoost.save(filename, model)
 		end
 	end
 	y_pr = XGBoost.predict(model, x)
 	return y_pr, pm, model
 end
 
-function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, epsilon::Float64=0.000000001, gamma::Float64=0.1, check::Bool=false, load::Bool=false, save::Bool=false, filemodel::AbstractString="", quiet::Bool=false, kw...)
+function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, epsilon::Float64=0.000000001, gamma::Float64=0.1, check::Bool=false, load::Bool=false, save::Bool=false, filename::AbstractString="", quiet::Bool=false, kw...)
 	if pm === nothing
 		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)
 	else
@@ -95,16 +95,16 @@ function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepc
 		@assert eltype(pm) <: Bool
 	end
 	xt = permutedims(x)
-	if load && isfile(filemodel)
-		@info("Loading SVR model from file: $(filemodel)")
-		model = SVR.loadmodel(filemodel)
+	if load && isfile(filename)
+		@info("Loading SVR model from file: $(filename)")
+		model = SVR.loadmodel(filename)
 	else
 		!quiet && @info("Training ...")
 		model = SVR.train(y[.!pm], xt[:, .!pm]; epsilon=epsilon, gamma=gamma)
-		if save && filemodel != ""
-			!quiet && @info("Saving model to file: $(filemodel)")
-			Mads.recursivemkdir(filemodel; filename=true)
-			SVR.savemodel(model, filemodel)
+		if save && filename != ""
+			!quiet && @info("Saving model to file: $(filename)")
+			Mads.recursivemkdir(filename; filename=true)
+			SVR.savemodel(model, filename)
 		end
 	end
 	y_pr = SVR.predict(model, xt)
@@ -115,7 +115,7 @@ function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepc
 	return y_pr, pm, model
 end
 
-function mljmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filemodel::AbstractString="", quiet::Bool=false, MLJmodel::DataType=MLJXGBoostInterface.XGBoostRegressor, self_tuning::Bool=false, kw...)
+function mljmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filename::AbstractString="", quiet::Bool=false, MLJmodel::DataType=MLJXGBoostInterface.XGBoostRegressor, ml_verbosity::Integer=0, self_tuning::Bool=false, kw...)
 	x_table = MLJ.table(x)
 	if pm === nothing
 		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)
@@ -123,9 +123,9 @@ function mljmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepc
 		@assert length(pm) == size(x, 1)
 		@assert eltype(pm) <: Bool
 	end
-	if load && isfile(filemodel)
-		@info("Loading MLJ model from file: $(filemodel)")
-		mlj_machine = MLJ.machine(filemodel)
+	if load && isfile(filename)
+		@info("Loading MLJ model from file: $(filename)")
+		mlj_machine = MLJ.machine(filename)
 	else
 		if self_tuning
 			!quiet && @info("Self-Tuning & Training ...")
@@ -148,9 +148,9 @@ function mljmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepc
 			mlj_machine = MLJ.machine(mljmodel, x_table, y)
 			MLJ.fit!(mlj_machine; verbosity=ml_verbosity)
 		end
-		if save && filemodel != ""
-			@info("Saving MLJ model to file: $(filemodel)")
-			Mads.recursivemkdir(filemodel; filename=true)
+		if save && filename != ""
+			@info("Saving MLJ model to file: $(filename)")
+			Mads.recursivemkdir(filename; filename=true)
 			MLJ.save(filename, xgb_machine_fit)
 		end
 	end
@@ -159,7 +159,14 @@ function mljmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepc
 end
 
 function predict(mlj_machine::MLJ.Machine, x::AbstractMatrix)
-	y_pr = MLJ.predict(mlj_machine, MLJ.table(x))
+	# display(x)
+	# @show typeof(mlj_machine)
+	y_pr = MLJ.predict(mlj_machine, MLJ.table(permutedims(x)))
+	return y_pr
+end
+
+function predict(xgb_machine::XGBoost.Booster, x::AbstractMatrix)
+	y_pr = XGBoost.predict(xgb_machine, x)
 	return y_pr
 end
 
@@ -168,7 +175,25 @@ function predict(svr_machine::SVR.svmmodel, x::AbstractMatrix)
 	return y_pr
 end
 
-function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vector(undef, 0), Xtn::AbstractMatrix=Matrix(undef, 0, 0); keepcases::BitArray=falses(size(Xo, 1)), modeltype::Symbol=:svr, ratio::Number=0, ptimes::Union{Vector{Integer},AbstractUnitRange}=1:length(times), plot::Bool=false, plottime::Bool=false, mask=Colon(), load::Bool=false, save::Bool=false, modeldir::AbstractString=joinpath(workingdir, "model_$(modeltype)"), plotdir::AbstractString=joinpath(workingdir, "figures_$(modeltype)"), case::AbstractString="", filemodel::AbstractString="", quiet::Bool=false, kw...)
+function save(filename::AbstractString, mlj_machine::MLJ.Machine)
+	Mads.recursivemkdir(filename; filename=true)
+	MLJ.save(filename, mlj_machine)
+	return nothing
+end
+
+function save(filename::AbstractString, xgb_machine::XGBoost.Booster)
+	Mads.recursivemkdir(filename; filename=true)
+	XGBoost.save(filename, xgb_machine)
+	return nothing
+end
+
+function save(filename::AbstractString, svr_machine::SVR.svmmodel)
+	Mads.recursivemkdir(filename; filename=true)
+	SVR.save(svr_machine, filename)
+	return nothing
+end
+
+function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vector(undef, 0), Xtn::AbstractMatrix=Matrix(undef, 0, 0); keepcases::BitArray=falses(size(Xo, 1)), modeltype::Symbol=:svr, ratio::Number=0, ptimes::Union{Vector{Integer},AbstractUnitRange}=1:length(times), plot::Bool=false, plottime::Bool=false, mask=Colon(), load::Bool=false, save::Bool=false, modeldir::AbstractString=joinpath(workingdir, "model_$(modeltype)"), plotdir::AbstractString=joinpath(workingdir, "figures_$(modeltype)"), case::AbstractString="", filename::AbstractString="", quiet::Bool=false, kw...)
 	inan = vec(.!isnan.(sum(Xo; dims=2))) .|| vec(.!isnan.(sum(Xi; dims=2)))
 	Xon, Xomin, Xomax, Xob = NMFk.normalizematrix_col(Xo[inan, :])
 	Xin, Ximin, Ximax, Xib = NMFk.normalizematrix_col(Xi[inan, :])
@@ -207,22 +232,22 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 			Mads.plotseries(Xo[pm, 1:ntimes]', "$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_prediction_series.png"; title="Prediction set ($(sum(pm)))", xaxis=times, xmin=0, xmax=times[end])
 		end
 	end
-	if (load || save) && (filemodel != "" || case != "")
-		filemodel = joinpath(modeldir, "$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm)).$(modeltype)model")
+	if (load || save) && (filename != "" || case != "")
+		filename = joinpath(modeldir, "$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm)).$(modeltype)model")
 	end
 	if modeltype == :svr
-		vy_prn, _, model = svrmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm, quiet=quiet, kw...)
+		vy_prn, _, model = svrmodel(vy_trn, T; load=load, save=save, filename=filename, pm=lpm, quiet=quiet, kw...)
 	elseif modeltype == :xgb
-		vy_prn, _, model = xgbmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm, quiet=quiet)
+		vy_prn, _, model = xgbmodel(vy_trn, T; load=load, save=save, filename=filename, pm=lpm, quiet=quiet)
 	elseif modeltype == :xgbpy
-		vy_prn, _, model = xgbpymodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm, quiet=quiet)
+		vy_prn, _, model = xgbpymodel(vy_trn, T; load=load, save=save, filename=filename, pm=lpm, quiet=quiet)
 	elseif modeltype == :flux
-		vy_prn, _, model = fluxmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm, quiet=quiet)
+		vy_prn, _, model = fluxmodel(vy_trn, T; load=load, save=save, filename=filename, pm=lpm, quiet=quiet)
 	elseif modeltype == :piml
-		vy_prn, _, model = pimlmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm, quiet=quiet)
+		vy_prn, _, model = pimlmodel(vy_trn, T; load=load, save=save, filename=filename, pm=lpm, quiet=quiet)
 	else
 		@warn("Unknown model type! SVR will be used!")
-		vy_prn, _, model = svrmodel(vy_trn, T; load=load, save=save, filemodel=filemodel, pm=lpm, quiet=quiet, kw...)
+		vy_prn, _, model = svrmodel(vy_trn, T; load=load, save=save, filename=filename, pm=lpm, quiet=quiet, kw...)
 	end
 	if ntimes > 0
 		vy_prn = reshape(vy_prn, ncases, ntimes)
