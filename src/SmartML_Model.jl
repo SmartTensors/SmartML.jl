@@ -1,14 +1,14 @@
 import MLJ
 import MLJXGBoostInterface
 import MLJLIBSVMInterface
-import ScikitLearn
 import XGBoost
 import Mads
 import NMFk
 import SVR
-import PyCall
 import Printf
 import Suppressor
+
+smlmodel = Union{SVR.svmmodel, MLJ.Machine}
 
 function setdata(Xin::AbstractMatrix, Xt::AbstractMatrix; order=Colon(), mask=Colon(), quiet::Bool=false)
 	ntimes = size(Xt, 1)
@@ -61,16 +61,6 @@ function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepc
 		model = XGBoost.load(filemodel)
 	else
 		!quiet && @info("Training ...")
-		# XGBRegressor(; base_score=0.5, booster='gbtree', colsample_bylevel=0.6,
-		#  colsample_bynode=1, colsample_bytree=0.9, enable_categorical=False,
-		#  gamma=0, gpu_id=-1, importance_type=None,
-		#  interaction_constraints='', learning_rate=0.3, max_delta_step=0,
-		#  max_depth=20, min_child_weight=1, missing=nan,
-		#  monotone_constraints='()', n_estimators=1000, n_jobs=16,
-		#  num_parallel_tree=1, predictor='auto', random_state=20,
-		#  reg_alpha=0, reg_lambda=1, scale_pos_weight=1, seed=20,
-		#  subsample=1.0, tree_method='exact', validate_parameters=1,
-		#  verbosity=None)
 		param_dict = Dict(:max_depth => 20,
 			:base_score => 0.5,
 			:learning_rate => 0.3,
@@ -95,40 +85,6 @@ function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepc
 	end
 	y_pr = XGBoost.predict(model, x)
 	return y_pr, pm, model
-end
-
-function xgbpymodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filemodel::AbstractString="", quiet::Bool=false, kw...)
-	if pm === nothing
-		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)
-	else
-		@assert length(pm) == size(x, 1)
-		@assert eltype(pm) <: Bool
-	end
-	if load && isfile(filemodel)
-		@info("Loading XGBoost model from file: $(filemodel)")
-		xgb_model = XGBoost.load(filemodel)
-	else
-		!quiet && @info("Training ...")
-		xgb = PyCall.pyimport("xgboost")
-		mod = xgb.XGBRegressor(seed=20)
-		param_dict = Dict("max_depth" => [3, 5, 6, 10, 15, 20],
-			"learning_rate" => [0.01, 0.1, 0.2, 0.3],
-			"subsample" => collect(0.5:0.1:1.0),
-			"colsample_bytree" => collect(0.4:0.1:1.0),
-			"colsample_bylevel" => collect(0.4:0.1:1.0),
-			"n_estimators" => [100, 500, 1000])
-		model = ScikitLearn.GridSearch.RandomizedSearchCV(mod, param_dict; verbose=1, n_jobs=1, n_iter=10, cv=5)
-		ScikitLearn.fit!(model, x[.!pm, :], y[.!pm])
-		xgb_model = model.best_estimator_
-		xgb_model.fit(x[.!pm, :], y[.!pm])
-		if save && filemodel != ""
-			@info("Saving model to file: $(filemodel)")
-			Mads.recursivemkdir(filemodel; filename=true)
-			XGBoost.save(filemodel, xgb_model)
-		end
-	end
-	y_pr = xgb_model.predict(x)
-	return y_pr, pm, xgb_model
 end
 
 function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, epsilon::Float64=0.000000001, gamma::Float64=0.1, check::Bool=false, load::Bool=false, save::Bool=false, filemodel::AbstractString="", quiet::Bool=false, kw...)
@@ -159,7 +115,7 @@ function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepc
 	return y_pr, pm, model
 end
 
-function mljmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filemodel::AbstractString="", quiet::Bool=false, ml_method::AbstractSting="XGBoostRegressor", ml_pkg="XGBoost", ml_verbosity::Integer=0, self_tuning::Bool=false, kw...)
+function mljmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filemodel::AbstractString="", quiet::Bool=false, MLJmodel::DataType=MLJXGBoostInterface.XGBoostRegressor, self_tuning::Bool=false, kw...)
 	x_table = MLJ.table(x)
 	if pm === nothing
 		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)
@@ -171,7 +127,6 @@ function mljmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepc
 		@info("Loading MLJ model from file: $(filemodel)")
 		mlj_machine = MLJ.machine(filemodel)
 	else
-		MLJmodel = MLJ.@load ml_method verbosity = ml_verbosity pkg = ml_pkg
 		if self_tuning
 			!quiet && @info("Self-Tuning & Training ...")
 			mljmodel = MLJmodel()
@@ -201,6 +156,16 @@ function mljmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepc
 	end
 	y_pr = MLJ.predict(mlj_machine, x_table)
 	return y_pr, pm, mlj_machine
+end
+
+function predict(mlj_machine::MLJ.Machine, x::AbstractMatrix)
+	y_pr = MLJ.predict(mlj_machine, MLJ.table(x))
+	return y_pr
+end
+
+function predict(svr_machine::SVR.svmmodel, x::AbstractMatrix)
+	y_pr = SVR.predict(svr_machine, x)
+	return y_pr
 end
 
 function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vector(undef, 0), Xtn::AbstractMatrix=Matrix(undef, 0, 0); keepcases::BitArray=falses(size(Xo, 1)), modeltype::Symbol=:svr, ratio::Number=0, ptimes::Union{Vector{Integer},AbstractUnitRange}=1:length(times), plot::Bool=false, plottime::Bool=false, mask=Colon(), load::Bool=false, save::Bool=false, modeldir::AbstractString=joinpath(workingdir, "model_$(modeltype)"), plotdir::AbstractString=joinpath(workingdir, "figures_$(modeltype)"), case::AbstractString="", filemodel::AbstractString="", quiet::Bool=false, kw...)
