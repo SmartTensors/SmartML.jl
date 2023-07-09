@@ -161,7 +161,7 @@ end
 function predict(mlj_machine::MLJ.Machine, x::AbstractMatrix)
 	# display(x)
 	# @show typeof(mlj_machine)
-	y_pr = MLJ.predict(mlj_machine, MLJ.table(permutedims(x)))
+	y_pr = MLJ.predict(mlj_machine, MLJ.table(x))
 	return y_pr
 end
 
@@ -171,7 +171,7 @@ function predict(xgb_machine::XGBoost.Booster, x::AbstractMatrix)
 end
 
 function predict(svr_machine::SVR.svmmodel, x::AbstractMatrix)
-	y_pr = SVR.predict(svr_machine, x)
+	y_pr = SVR.predict(svr_machine, permutedims(x))
 	return y_pr
 end
 
