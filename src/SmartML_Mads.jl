@@ -244,7 +244,7 @@ function set_input_transient_matrix(input_transient_data_keys::Base.KeySet, well
 	for (i, k) in enumerate(input_transient_data_keys)
 		n = titlecase(replace(String(k), "_"=>" "))
 		ind = only(indexin([n], well_attributes))
-		if ind === nothing
+		if isnothing(ind)
 			@warn "Attribute $n is missing"
 		else
 			@info n
@@ -258,7 +258,7 @@ function set_input_transient_matrix(input_transient_data_keys::Base.KeySet, well
 			v1 = vec(well_data[:,indexin(["Produced Volume"], well_attributes)])
 			v2 = vec(well_data[:,indexin(["Production Rate"], well_attributes)])
 			v = v1 ./ v2
-		elseif ind === nothing && k == :perforation_efficiency
+		elseif isnothing(ind) && k == :perforation_efficiency
 			@warn("Perforation efficiency needs to be computed! Reservoir Pressure stored as Peforation Efficiency!")
 			# v = ones(Float32, ntimes) * 0.17
 			# v[1] = 1.0

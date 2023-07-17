@@ -7,7 +7,7 @@ import SVR
 import Printf
 import Suppressor
 
-if Base.source_path() !== nothing && Base.source_path() != ""
+if !isnothing(Base.source_path()) && Base.source_path() != ""
 	const smartmldir = first(splitdir(first(splitdir(Base.source_path()))))
 else
 	const smartmldir = "."

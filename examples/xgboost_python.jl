@@ -1,5 +1,5 @@
 function xgbpymodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filemodel::AbstractString="", quiet::Bool=false, kw...)
-	if pm === nothing
+	if isnothing(pm)
 		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)
 	else
 		@assert length(pm) == size(x, 1)

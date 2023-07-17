@@ -50,7 +50,7 @@ function fluxmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keep
 end
 
 function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filename::AbstractString="", quiet::Bool=false, kw...)
-	if pm === nothing
+	if isnothing(pm)
 		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)
 	else
 		@assert length(pm) == size(x, 1)
@@ -88,7 +88,7 @@ function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepc
 end
 
 function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, epsilon::Float64=0.000000001, gamma::Float64=0.1, check::Bool=false, load::Bool=false, save::Bool=false, filename::AbstractString="", quiet::Bool=false, kw...)
-	if pm === nothing
+	if isnothing(pm)
 		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)
 	else
 		@assert length(pm) == size(x, 1)
@@ -117,7 +117,7 @@ end
 
 function mljmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filename::AbstractString="", quiet::Bool=true, MLJmodel::DataType=MLJXGBoostInterface.XGBoostRegressor, ml_verbosity::Integer=0, self_tuning::Bool=false, kw...)
 	x_table = MLJ.table(x)
-	if pm === nothing
+	if isnothing(pm)
 		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)
 	else
 		@assert length(pm) == size(x, 1)

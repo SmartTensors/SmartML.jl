@@ -85,7 +85,7 @@ function plot_data(smarttensors_model::DataModel, cluster_column::Symbol)
 	n = smarttensors_model.attributes[][use_columns[1:end-1]]
 	@info("Data attributes: $(n)")
 	c = first(indexin([string(cluster_column)], smarttensors_model.attributes[]))
-	if c !== nothing || cluster_column == :Cluster
+	if !isnothing(c) || cluster_column == :Cluster
 		@info("Plotting data for $(cluster_column) ...")
 	else
 		@warn("Cannot plot data for $(cluster_column)!")
@@ -103,13 +103,13 @@ function plot_data(smarttensors_model::DataModel, cluster_column::Symbol)
 			end
 			plot = StipplePlotly.PlotData(
 						x = x_attribute_collection,
-						y = y_attribute_collection,					
+						y = y_attribute_collection,
 						mode = "markers",
 						name = string(species),
 						plot = StipplePlotly.Charts.PLOT_TYPE_SCATTER)
 			push!(plot_collection, plot)
 		end
-	else		
+	else
 		z = df[!, Symbol(smarttensors_model.z_attribute[])]
 		plot = StipplePlotly.PlotData(
 					x = df[!, Symbol(smarttensors_model.x_attribute[])],
@@ -121,7 +121,7 @@ function plot_data(smarttensors_model::DataModel, cluster_column::Symbol)
 	end
 	smarttensors_model.layout[] = StipplePlotly.PlotLayout(plot_bgcolor = "#fff",
 	xaxis = [StipplePlotly.PlotLayoutAxis(xy = "x", index = 1, title = smarttensors_model.x_attribute[], ticks="outside", showline = false, zeroline = true)],
-	yaxis = [StipplePlotly.PlotLayoutAxis(xy = "y", index = 1, title = smarttensors_model.y_attribute[], ticks="outside", showline = false, zeroline = true)])	
+	yaxis = [StipplePlotly.PlotLayoutAxis(xy = "y", index = 1, title = smarttensors_model.y_attribute[], ticks="outside", showline = false, zeroline = true)])
 	return plot_collection
 end
 
