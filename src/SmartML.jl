@@ -7,19 +7,12 @@ import SVR
 import Printf
 import Suppressor
 
-if !isnothing(Base.source_path()) && Base.source_path() != ""
-	const smartmldir = first(splitdir(first(splitdir(Base.source_path()))))
-else
-	const smartmldir = "."
+const smartmldir = Base.pkgdir(SmartML)
+workdir = smartmldir
+
+function setworkdir(dirname::AbstractString)
+	global workdir = dirname
 end
-
-workingdir = "."
-
-function setworkingdir(dirname::AbstractString)
-	global workingdir = dirname
-end
-
-workdir = "."
 
 include("SmartML_Model.jl")
 include("SmartML_Mads.jl")

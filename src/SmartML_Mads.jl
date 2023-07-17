@@ -8,7 +8,7 @@ import Gadfly
 import JLD
 import Statistics
 
-function mads(paraminit::AbstractVector, obstarget::AbstractVector, madsmodel::Function, case::AbstractString; parammin::AbstractArray=Vector{Float32}(undef, 0), parammax::AbstractArray=Vector{Float32}(undef, 0), obsmin::Union{Float64,AbstractArray}=Matrix(undef, 0, 0), obsmax::Union{Float64,AbstractArray}=Matrix(undef, 0, 0), obstime::Union{Nothing,AbstractVector}=nothing, madsdir::AbstractString=joinpath(SmartML.workingdir, "_mads"), kw...)
+function mads(paraminit::AbstractVector, obstarget::AbstractVector, madsmodel::Function, case::AbstractString; parammin::AbstractArray=Vector{Float32}(undef, 0), parammax::AbstractArray=Vector{Float32}(undef, 0), obsmin::Union{Float64,AbstractArray}=Matrix(undef, 0, 0), obsmax::Union{Float64,AbstractArray}=Matrix(undef, 0, 0), obstime::Union{Nothing,AbstractVector}=nothing, madsdir::AbstractString=joinpath(SmartML.workdir, "_mads"), kw...)
 	Mads.mkdir(madsdir)
 	md = Mads.createproblem(paraminit, obstarget, madsmodel; problemname=joinpath(madsdir, "$(case)"), parammin=parammin, parammax=parammax, obstime=obstime, obsmin=obsmin, obsmax=obsmax, kw...)
 	@info("Model parameters:")
@@ -34,7 +34,7 @@ function calibrate(md::AbstractDict; random::Bool=true, reruns::Number=10, kw...
 	return pe
 end
 
-function calibrationresults(md::AbstractDict, pe::AbstractDict; madsdir::AbstractString=joinpath(SmartML.workingdir, "_mads"), case::AbstractString=Mads.getmadsrootname(md), f_calibrated_pi::AbstractString="", f_calibrated_parameters::AbstractString="", f_match::AbstractString="", parammin::AbstractArray=Vector{Float32}(undef, 0), parammax::AbstractArray=Vector{Float32}(undef, 0), plot::Bool=true, xtitle="", ytitle="")
+function calibrationresults(md::AbstractDict, pe::AbstractDict; madsdir::AbstractString=joinpath(SmartML.workdir, "_mads"), case::AbstractString=Mads.getmadsrootname(md), f_calibrated_pi::AbstractString="", f_calibrated_parameters::AbstractString="", f_match::AbstractString="", parammin::AbstractArray=Vector{Float32}(undef, 0), parammax::AbstractArray=Vector{Float32}(undef, 0), plot::Bool=true, xtitle="", ytitle="")
 	f = Mads.forward(md, pe)
 	of = Mads.of(md, f)
 	@info("Model calibration OF (model discrepency): $(round(of; sigdigits=2))")
@@ -77,7 +77,7 @@ function calibrationresults(md::AbstractDict, pe::AbstractDict; madsdir::Abstrac
 	end
 end
 
-function emcee(md::AbstractDict=Dict(); parammin::AbstractArray=Vector{Float32}(undef, 0), parammax::AbstractArray=Vector{Float32}(undef, 0), madsdir::AbstractString=joinpath(SmartML.workingdir, "_mads"), case::AbstractString="", f_emcee_pi::AbstractString="", f_emcee_parameters::AbstractString="", f_emcee_parameters_mean::AbstractString="", f_emcee_parameters_jld::AbstractString="", f_emcee_scatter::AbstractString="", f_emcee_spaghetti::AbstractString="", f_emcee_best_worst::AbstractString="", f_emcee_p10_50_90::AbstractString="", ofmax::Number=Inf, nsteps=1000000, burnin=max(Int(nsteps/100), 100), thinning=max(Int(burnin/100), 10), numwalkers=thinning, load::Bool=true, save::Bool=true, plot::Bool=true, execute::Bool=true, best_worst::Integer=0, xtitle="", ytitle="")
+function emcee(md::AbstractDict=Dict(); parammin::AbstractArray=Vector{Float32}(undef, 0), parammax::AbstractArray=Vector{Float32}(undef, 0), madsdir::AbstractString=joinpath(SmartML.workdir, "_mads"), case::AbstractString="", f_emcee_pi::AbstractString="", f_emcee_parameters::AbstractString="", f_emcee_parameters_mean::AbstractString="", f_emcee_parameters_jld::AbstractString="", f_emcee_scatter::AbstractString="", f_emcee_spaghetti::AbstractString="", f_emcee_best_worst::AbstractString="", f_emcee_p10_50_90::AbstractString="", ofmax::Number=Inf, nsteps=1000000, burnin=max(Int(nsteps/100), 100), thinning=max(Int(burnin/100), 10), numwalkers=thinning, load::Bool=true, save::Bool=true, plot::Bool=true, execute::Bool=true, best_worst::Integer=0, xtitle="", ytitle="")
 	case = case == "" ? Mads.getmadsrootname(md) : case
 	fp = joinpath(madsdir, "$(case)")
 	f_emcee_pi = setfilename(f_emcee_pi, madsdir, fp, "_emcee_pi.csv")
@@ -276,7 +276,7 @@ function set_input_transient_matrix(input_transient_data_keys::Base.KeySet, well
 	return input_transient_data_dof, input_transient_matrix_dof
 end
 
-function modelselection(Xo::AbstractMatrix, times::AbstractVector, pi_times::AbstractVector, pi_targets::AbstractVector, case::AbstractString, topcase::Integer=20; thickness_ratio::Number=1, madsdir::AbstractString=joinpath(SmartML.workingdir, "_mads"), filename::AbstractString="", plot::Bool=true)
+function modelselection(Xo::AbstractMatrix, times::AbstractVector, pi_times::AbstractVector, pi_targets::AbstractVector, case::AbstractString, topcase::Integer=20; thickness_ratio::Number=1, madsdir::AbstractString=joinpath(SmartML.workdir, "_mads"), filename::AbstractString="", plot::Bool=true)
 	case = case == "" ? "case" : case
 	fp = joinpath(madsdir, "$(case)")
 	filename = setfilename(filename, madsdir, fp, "_model_selection_match.png")
