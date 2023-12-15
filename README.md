@@ -1,19 +1,16 @@
-SmartML
------
+# SmartML
 
-**SmartML** is one of the tools in the **SmartTensors** ML framework ([smarttensors.com](https://smarttensors.com)).
+**SmartML** performs unsupervised, supervised, and physics/science-informed Machine Learning (ML).
+**SmartML** is a module in the **SmartTensors** ML framework ([smarttensors.com](https://smarttensors.com)).
 
 <div style="text-align: left">
     <img src="logo/SmartTensorsNewSmall.png" alt="SmartTensors" width=25%  max-width=125px;/>
 </div>
 
-**SmartML** applied unsupervised and supervised machine learning methodology that allows for automatic identification of the optimal number of features (signals/signatures) present in the data.
-
-
-**SmartML** can be applied to perform:
+**SmartTensors** can be applied to perform:
 - Feature extraction (**FE**)
 - Blind source separation (**BSS**)
-- Detection of disruptions / anomalies
+- Detection of disruptions/anomalies
 - Image recognition
 - Text mining
 - Data classification
@@ -21,17 +18,17 @@ SmartML
 - Discovery of unknown dependencies and phenomena
 - Development of reduced-order/surrogate models
 - Identification of dependencies between model inputs and outputs
-- Guiding the development of physics models representing the ML analyzed data
+- Guiding the development of physics models representing the ML-analyzed data
 - Blind predictions
 - Optimization of data acquisition (optimal experimental design)
 - Labeling of datasets for supervised ML analyses
 
 **SmartML** provides high-performance computing capabilities to solve problems with Shared and Distributed Arrays in parallel.
-The parallelization allows for utilization of multi-core / multi-processor environments.
+The parallelization allows for the utilization of multi-core / multi-processor environments.
 GPU and TPU accelerations are available through existing Julia packages.
 
 **SmartML** provides advanced tools for data visualization, pre- and post-processing.
-These tools substantially facilitate utilization of the package in various real-world applications.
+These tools substantially facilitate the utilization of the package in various real-world applications.
 
 **SmartML** methodology and applications are discussed in the research papers and presentations listed below.
 
