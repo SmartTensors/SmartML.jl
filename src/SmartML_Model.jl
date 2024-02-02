@@ -159,8 +159,6 @@ function mljmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepc
 end
 
 function predict(mlj_machine::MLJ.Machine, x::AbstractMatrix)
-	# display(x)
-	# @show typeof(mlj_machine)
 	y_pr = MLJ.predict(mlj_machine, MLJ.table(x))
 	return y_pr
 end
