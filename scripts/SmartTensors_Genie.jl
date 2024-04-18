@@ -6,7 +6,6 @@ import StipplePlotly
 import CSV
 import JLD
 import JLD2
-import FileIO
 import DataFrames
 import NMFk
 import Mads
@@ -64,7 +63,7 @@ function load_data!(smarttensors_model::DataModel, filename)
 	if  e == ".csv"
 		data_input = CSV.read(joinpath(datasetdir, f), DataFrames.DataFrame)
 	elseif e == ".jld2"
-		data_input = FileIO.load(joinpath(datasetdir, f), "df")
+		data_input = JLD2.load(joinpath(datasetdir, f), "df")
 	elseif e == ".jld"
 		data_input = JLD.load(joinpath(datasetdir, f), "df")
 	end
