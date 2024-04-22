@@ -139,7 +139,7 @@ function compute_clusters!(smarttensors_model::DataModel)
 		@info("Label attributes: $(label_columns)")
 		labels = string.(vec(collect(Matrix(df[:, [Symbol(c) for c in label_columns]]))))
 	else
-		labels = ["w$i" for i = 1:size(W, 1)]
+		labels = ["w$i" for i in axes(W, 1)]
 	end
 	@show labels
 	im = ismissing.(data)

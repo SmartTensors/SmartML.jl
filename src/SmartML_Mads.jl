@@ -283,7 +283,7 @@ function modelselection(Xo::AbstractMatrix, times::AbstractVector, pi_times::Abs
 	newpi = Interpolations.LinearInterpolation(pi_times, pi_targets, extrapolation_bc=Interpolations.Line()).(times)
 	@assert size(Xo[1,:]) == size(newpi)
 	s = Vector{Float32}(undef, size(Xo, 1))
-	for i = 1:size(Xo, 1)
+	for i in axes(Xo, 1)
 		s[i] = sum((Xo[i,:] ./ thickness_ratio .- newpi) .^ 2)
 	end
 	if plot
