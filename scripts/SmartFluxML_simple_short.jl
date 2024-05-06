@@ -63,7 +63,7 @@ function loss(data_loader, model, device)
 	return ls / num
 end
 
-@Base.kwdef mutable struct Args
+Base.@kwdef mutable struct Args
 	sizetrain = 500
 	sizetest = 500
 	η::Float64 = 3e-4        # learning rate

@@ -24,7 +24,7 @@ figuredir = joinpath(@__DIR__, "..", "gui-results")
 Mads.mkdir(datasetdir)
 Mads.mkdir(figuredir)
 
-@Stipple.reactive mutable struct DataModel <: Stipple.ReactiveModel
+Stipple.@reactive mutable struct DataModel <: Stipple.ReactiveModel
 	rerun::Stipple.R{Int} = 0
 	datasets_reload::Stipple.R{Int} = 0
 	dataset::Stipple.R{String} = ""
@@ -229,10 +229,10 @@ function ui_smarttensors(smarttensors_model::DataModel)
 				Stipple.cell(class="st-module", [StippleUI.uploader(label="Upload Dataset:", :auto__upload, method="POST", url="http://localhost:9000/", field__name="csv_file")
 				])
 				Stipple.cell(class="st-module", [
-					Stipple.button("Reload the data directory!", @StippleUI.click("datasets_reload += 1"))
+					Stipple.button("Reload the data directory!", StippleUI.@click("datasets_reload += 1"))
 				])
 				Stipple.cell(class="st-module", [
-					Stipple.button("Rerun!", @StippleUI.click("rerun += 1"))
+					Stipple.button("Rerun!", StippleUI.@click("rerun += 1"))
 				])
 			])
 			Stipple.row([
@@ -254,11 +254,11 @@ function ui_smarttensors(smarttensors_model::DataModel)
 			Stipple.row([
 				Stipple.cell(class="st-module", [
 					Stipple.h6("Number of clusters:")
-					StippleUI.slider(1:1:20, @Stipple.data(:no_of_clusters); label=true)
+					StippleUI.slider(1:1:20, Stipple.@data(:no_of_clusters); label=true)
 				])
 				Stipple.cell(class="st-module", [
 					Stipple.h6("Number of iterations:")
-					StippleUI.slider(10:10:200, @Stipple.data(:no_of_iterations); label=true)
+					StippleUI.slider(10:10:200, Stipple.@data(:no_of_iterations); label=true)
 				])
 				Stipple.cell(class="st-module", [
 					Stipple.h6("X attribute:")
