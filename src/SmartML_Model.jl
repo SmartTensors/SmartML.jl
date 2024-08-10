@@ -46,10 +46,10 @@ function setup_mask(ratio::Number, keepcases::BitArray, ncases, ntimes, ptimes::
 	return pm, lpm
 end
 
-function fluxmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, check::Bool=false, load::Bool=false, save::Bool=false, filename::AbstractString="", quiet::Bool=false, kw...)
+function fluxmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepcases::BitArray=falses(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, check::Bool=false, load::Bool=false, save::Bool=false, filename::AbstractString="", quiet::Bool=false, kw...)
 end
 
-function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filename::AbstractString="", quiet::Bool=false, kw...)
+function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepcases::BitArray=falses(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filename::AbstractString="", quiet::Bool=false, kw...)
 	if isnothing(pm)
 		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)
 	else
@@ -76,6 +76,7 @@ function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepc
 			:reg_alpha => 0,
 			:reg_lambda => 1,
 			:n_estimators => 1000)
+		@show x
 		model = XGBoost.xgboost(x[.!pm, :], 20; label=y[.!pm], verbose=0, silent=1, param_dict...)
 		if save && filename != ""
 			@info("Saving model to file: $(filename)")
@@ -87,7 +88,7 @@ function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepc
 	return y_pr, pm, model
 end
 
-function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, epsilon::Float64=0.000000001, gamma::Float64=0.1, check::Bool=false, load::Bool=false, save::Bool=false, filename::AbstractString="", quiet::Bool=false, kw...)
+function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepcases::BitArray=falses(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, epsilon::Float64=0.000000001, gamma::Float64=0.1, check::Bool=false, load::Bool=false, save::Bool=false, filename::AbstractString="", quiet::Bool=false, kw...)
 	if isnothing(pm)
 		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)
 	else
@@ -115,7 +116,7 @@ function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepc
 	return y_pr, pm, model
 end
 
-function mljmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepcases::BitArray=trues(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filename::AbstractString="", quiet::Bool=true, MLJmodel::DataType=MLJXGBoostInterface.XGBoostRegressor, ml_verbosity::Integer=0, self_tuning::Bool=false, kw...)
+function mljmodel(y::AbstractVector, x::AbstractMatrix; ratio::Number=0.0, keepcases::BitArray=falses(length(y)), pm::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filename::AbstractString="", quiet::Bool=true, MLJmodel::DataType=MLJXGBoostInterface.XGBoostRegressor, ml_verbosity::Integer=0, self_tuning::Bool=false, kw...)
 	x_table = MLJ.table(x)
 	if isnothing(pm)
 		pm = SVR.get_prediction_mask(length(y), ratio; keepcases=keepcases, debug=true)
@@ -192,6 +193,7 @@ function save(filename::AbstractString, svr_machine::SVR.svmmodel)
 end
 
 function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vector(undef, 0), Xtn::AbstractMatrix=Matrix(undef, 0, 0); keepcases::BitArray=falses(size(Xo, 1)), modeltype::Symbol=:svr, ratio::Number=0, ptimes::Union{Vector{Integer},AbstractUnitRange}=1:length(times), plot::Bool=false, plottime::Bool=false, mask=Colon(), load::Bool=false, save::Bool=false, modeldir::AbstractString=joinpath(workdir, "model_$(modeltype)"), plotdir::AbstractString=joinpath(workdir, "figures_$(modeltype)"), case::AbstractString="", filename::AbstractString="", quiet::Bool=false, kw...)
+	Mads.recursivemkdir(plotdir; filename=false)
 	inan = vec(.!isnan.(sum(Xo; dims=2))) .|| vec(.!isnan.(sum(Xi; dims=2)))
 	Xon, Xomin, Xomax, Xob = NMFk.normalizematrix_col(Xo[inan, :])
 	Xin, Ximin, Ximax, Xib = NMFk.normalizematrix_col(Xi[inan, :])
@@ -218,16 +220,16 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 	end
 	if !quiet
 		@info("Number of cases for training: $(ncases - sum(pm))")
-		@info("Number of cases for prediction: $(sum(pm))")
+		@info("Number of cases for validation: $(sum(pm))")
 		if ntimes > 0
 			@info("Number of cases/transients for training: $(ncases * ntimes - sum(lpm))")
-			@info("Number of cases/transients for prediction: $(sum(lpm))")
+			@info("Number of cases/transients for validation: $(sum(lpm))")
 		end
 	end
 	if plot && ntimes > 0
 		Mads.plotseries(Xo[.!pm, 1:ntimes]', "$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_training_series.png"; title="Training set ($(sum(.!pm)))", xaxis=times, xmin=0, xmax=times[end])
 		if sum(pm) > 0
-			Mads.plotseries(Xo[pm, 1:ntimes]', "$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_prediction_series.png"; title="Prediction set ($(sum(pm)))", xaxis=times, xmin=0, xmax=times[end])
+			Mads.plotseries(Xo[pm, 1:ntimes]', "$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_validation_series.png"; title="Validation set ($(sum(pm)))", xaxis=times, xmin=0, xmax=times[end])
 		end
 	end
 	if (load || save) && (filename != "" || case != "")
@@ -297,7 +299,7 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 	if sum(lpm) > 0
 		r2p = SVR.r2(vy_tr[lpm], vy_pr[lpm])
 		rmsep = NMFk.rmsenan(vy_tr[lpm], vy_pr[lpm])
-		!quiet && println("Prediction $(ncases - sum(pm)) / $(sum(pm)) $(ratio) r2 = $(round(r2p; sigdigits=3)) rmse = $(round(rmsep; sigdigits=3))")
+		!quiet && println("Validation $(ncases - sum(pm)) / $(sum(pm)) $(ratio) r2 = $(round(r2p; sigdigits=3)) rmse = $(round(rmsep; sigdigits=3))")
 	else
 		r2p = rmsep = NaN
 	end
@@ -310,7 +312,7 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 
 	end
 	if plot && sum(lpm) > 0
-		NMFk.plotscatter(vy_tr[lpm], vy_pr[lpm]; title="Prediction Size: $(sum(pm)); r<sup>2</sup>: $(round(r2p; sigdigits=3))", xtitle="True", ytitle="Estimate", filename="$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_scatter_prediction.png")
+		NMFk.plotscatter(vy_tr[lpm], vy_pr[lpm]; title="Validation Size: $(sum(pm)); r<sup>2</sup>: $(round(r2p; sigdigits=3))", xtitle="True", ytitle="Estimate", filename="$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_scatter_validation.png")
 	end
 	if ntimes > 0
 		y_pr = reshape(vy_pr, ncases, ntimes)
@@ -325,8 +327,8 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 	return mlmodel, model, y_pr, T
 end
 
-function sensitivity(Xon::AbstractMatrix, Xin::AbstractMatrix, times::AbstractVector, keepcases::BitArray, attributes::AbstractVector; kw...)
-	@assert sz == length(attributes)
+function sensitivity(Xon::AbstractMatrix, Xin::AbstractMatrix, times::AbstractVector=["Time_$(i)" for i in axes(Xon, 2)], keepcases::BitArray=falses(size(Xon, 1)), attributes::AbstractVector=["Param_$(i)" for i in axes(Xin, 2)]; kw...)
+	sz = length(attributes)
 	mask = trues(sz)
 	local vcountt
 	local vcountp
@@ -348,7 +350,7 @@ function sensitivity(Xon::AbstractMatrix, Xin::AbstractMatrix, times::AbstractVe
 	end
 end
 
-function analysis_eachtime(Xon::AbstractMatrix, Xin::AbstractMatrix, times::AbstractVector, keepcases::BitArray; modeltype::Symbol=:svr, ptimes::AbstractUnitRange=1:length(times), plot::Bool=false, trainingrange::AbstractVector=[0.0, 0.05, 0.1, 0.2, 0.33], epsilon::Float64=0.000000001, gamma::Float64=0.1, nreruns::Int64=10, mask=Colon())
+function analysis_eachtime(Xon::AbstractMatrix, Xin::AbstractMatrix, times::AbstractVector, keepcases::BitArray=falses(size(Xon, 1)); modeltype::Symbol=:svr, ptimes::AbstractUnitRange=1:length(times), plot::Bool=false, trainingrange::AbstractVector=[0.0, 0.05, 0.1, 0.2, 0.33], epsilon::Float64=0.000000001, gamma::Float64=0.1, nreruns::Int64=10, mask=Colon())
 	ntimes = length(times)
 	ncases = size(Xin, 1)
 	vcountt = Vector{Int64}(undef, 0)
