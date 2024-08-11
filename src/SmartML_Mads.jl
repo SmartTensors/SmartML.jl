@@ -1,12 +1,3 @@
-import Mads
-import NMFk
-import SVR
-import Printf
-import Suppressor
-import DelimitedFiles
-import Gadfly
-import JLD
-import Statistics
 
 function mads(paraminit::AbstractVector, obstarget::AbstractVector, madsmodel::Function, case::AbstractString; parammin::AbstractArray=Vector{Float32}(undef, 0), parammax::AbstractArray=Vector{Float32}(undef, 0), obsmin::Union{Float64,AbstractArray}=Matrix(undef, 0, 0), obsmax::Union{Float64,AbstractArray}=Matrix(undef, 0, 0), obstime::Union{Nothing,AbstractVector}=nothing, madsdir::AbstractString=joinpath(SmartML.workdir, "_mads"), kw...)
 	Mads.mkdir(madsdir)
@@ -291,10 +282,4 @@ function modelselection(Xo::AbstractMatrix, times::AbstractVector, pi_times::Abs
 		Mads.plotseries(pi_targets, filename; xaxis=pi_times, plotline=false, pointsize=3Gadfly.pt, gl=c, title="Well $(case): Top $(topcase) models")
 	end
 	return s
-end
-
-function setfilename(filename::AbstractString, dirname::AbstractString, prefix::AbstractString, suffix::AbstractString)
-	filename = filename == "" ? prefix * suffix : filename
-	Mads.recursivemkdir(joinpath(dirname, filename); filename=true)
-	return filename
 end
