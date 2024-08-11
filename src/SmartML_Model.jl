@@ -1,4 +1,4 @@
-function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vector(undef, 0), Xtn::AbstractMatrix=Matrix(undef, 0, 0); keepcases::BitArray=falses(size(Xo, 1)), modeltype::Symbol=:svr, ratio::Number=0, ptimes::Union{Vector{Integer},AbstractUnitRange}=1:length(times), plot::Bool=false, plottime::Bool=false, mask=Colon(), load::Bool=false, save::Bool=false, modeldir::AbstractString=joinpath(workdir, "model_$(modeltype)"), plotdir::AbstractString=joinpath(workdir, "figures_$(modeltype)"), case::AbstractString="", filename::AbstractString="", quiet::Bool=false, kw...)
+function model_fully_transient(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vector(undef, 0), Xtn::AbstractMatrix=Matrix(undef, 0, 0); keepcases::BitArray=falses(size(Xo, 1)), modeltype::Symbol=:svr, ratio::Number=0, ptimes::Union{Vector{Integer},AbstractUnitRange}=1:length(times), plot::Bool=false, plottime::Bool=false, mask=Colon(), load::Bool=false, save::Bool=false, modeldir::AbstractString=joinpath(workdir, "model_$(modeltype)"), plotdir::AbstractString=joinpath(workdir, "figures_$(modeltype)"), case::AbstractString="", filename::AbstractString="", quiet::Bool=false, kw...)
 	Mads.recursivemkdir(plotdir; filename=false)
 	inan = vec(.!isnan.(sum(Xo; dims=2))) .|| vec(.!isnan.(sum(Xi; dims=2)))
 	Xon, Xomin, Xomax = NMFk.normalize(Xo[inan, :])
@@ -84,12 +84,12 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 		return y
 	end
 	function mlmodel(t::AbstractVector, x::AbstractVector)
-		tn, _, _ = NMFk.normalize(Float64.(t); amin=tmin, amax=tmax)
+		tnl, _, _ = NMFk.normalize(Float64.(t); amin=tmin, amax=tmax)
 		xn = first(NMFk.normalize(x; amin=Ximin, amax=Ximax))
 		ntimes = length(t)
 		y = Vector{Float64}(undef, ntimes)
-		for i = eachindex(tn)
-			y[i] = first(predict(model, reshape([tn[i]; xn], (1, nparams1))))
+		for i = eachindex(tnl)
+			y[i] = first(predict(model, reshape([tnl[i]; xn], (1, nparams1))))
 		end
 		NMFk.denormalize!(y, Xomin, Xomax)
 		return y
@@ -113,12 +113,12 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 	end
 	function mlmodel(t::AbstractVector, X::AbstractMatrix)
 		nc = size(X, 1)
-		tn, _, _ = NMFk.normalize(Float64.(t); amin=tmin, amax=tmax)
+		tnl, _, _ = NMFk.normalize(Float64.(t); amin=tmin, amax=tmax)
 		ntimes = length(t)
 		Xn, _, _ = NMFk.normalize(X; amin=Ximin, amax=Ximax)
 		Yn = Matrix{Float64}(undef, nc, ntimes)
-		for i = eachindex(tn)
-			S = [repeat(tn[i:i], nc) Xn]
+		for i = eachindex(tnl)
+			S = [repeat(tnl[i:i], nc) Xn]
 			Yn[:, i] = predict(model, S)
 		end
 		Y = NMFk.denormalize(Yn, Xomin, Xomax)
@@ -158,7 +158,7 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 	return mlmodel, model, y_pr, pm
 end
 
-function model_col(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vector(undef, 0), Xtn::AbstractMatrix=Matrix(undef, 0, 0); keepcases::BitArray=falses(size(Xo, 1)), modeltype::Symbol=:svr, ratio::Number=0, ptimes::Union{Vector{Integer},AbstractUnitRange}=1:length(times), plot::Bool=false, plottime::Bool=false, mask=Colon(), load::Bool=false, save::Bool=false, modeldir::AbstractString=joinpath(workdir, "model_$(modeltype)"), plotdir::AbstractString=joinpath(workdir, "figures_$(modeltype)"), case::AbstractString="", filename::AbstractString="", quiet::Bool=false, kw...)
+function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vector(undef, 0), Xtn::AbstractMatrix=Matrix(undef, 0, 0); keepcases::BitArray=falses(size(Xo, 1)), modeltype::Symbol=:svr, ratio::Number=0, ptimes::Union{Vector{Integer},AbstractUnitRange}=1:length(times), plot::Bool=false, plottime::Bool=false, mask=Colon(), load::Bool=false, save::Bool=false, modeldir::AbstractString=joinpath(workdir, "model_$(modeltype)"), plotdir::AbstractString=joinpath(workdir, "figures_$(modeltype)"), case::AbstractString="", filename::AbstractString="", quiet::Bool=false, kw...)
 	Mads.recursivemkdir(plotdir; filename=false)
 	inan = vec(.!isnan.(sum(Xo; dims=2))) .|| vec(.!isnan.(sum(Xi; dims=2)))
 	Xon, Xomin, Xomax, Xob = NMFk.normalizematrix_col(Xo[inan, :])
@@ -234,8 +234,10 @@ function model_col(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector
 	aimax = vec(Ximax)
 	aomin = vec(Xomin)
 	aomax = vec(Xomax)
-	Xomin_interpolated = Interpolations.CubicSplineInterpolation(times, aomin, extrapolation_bc=Interpolations.Line())
-	Xomax_interpolated = Interpolations.CubicSplineInterpolation(times, aomax, extrapolation_bc=Interpolations.Line())
+	if ntimes > 0
+		Xomin_interpolated = Interpolations.CubicSplineInterpolation(0:ntimes-1, aomin, extrapolation_bc=Interpolations.Line())
+		Xomax_interpolated = Interpolations.CubicSplineInterpolation(0:ntimes-1, aomax, extrapolation_bc=Interpolations.Line())
+	end
 	function mlmodel(x::AbstractVector)
 		xn = first(NMFk.normalize(x; amin=aimin, amax=aimax))
 		if ntimes > 0
@@ -250,12 +252,12 @@ function model_col(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector
 		return y
 	end
 	function mlmodel(t::AbstractVector, x::AbstractVector)
-		tn, _, _ = NMFk.normalize(Float64.(t); amin=tmin, amax=tmax)
+		tnl, _, _ = NMFk.normalize(Float64.(t); amin=tmin, amax=tmax)
 		xn = first(NMFk.normalize(x; amin=aimin, amax=aimax))
 		ntimes = length(t)
 		y = Vector{Float64}(undef, ntimes)
-		for i = eachindex(tn)
-			y[i] = first(predict(model, reshape([tn[i]; xn], (1, nparams1))))
+		for i = eachindex(tnl)
+			y[i] = first(predict(model, reshape([tnl[i]; xn], (1, nparams1))))
 		end
 		NMFk.denormalize!(y, Xomin_interpolated(t), Xomax_interpolated(t))
 		return y
@@ -279,12 +281,12 @@ function model_col(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector
 	end
 	function mlmodel(t::AbstractVector, X::AbstractMatrix)
 		nc = size(X, 1)
-		tn, _, _ = NMFk.normalize(Float64.(t); amin=tmin, amax=tmax)
+		tnl, _, _ = NMFk.normalize(Float64.(t); amin=tmin, amax=tmax)
 		ntimes = length(t)
 		Xn, _, _, _ = NMFk.normalizematrix_col(X; amin=Ximin, amax=Ximax)
 		Yn = Matrix{Float64}(undef, nc, ntimes)
-		for i = eachindex(tn)
-			S = [repeat(tn[i:i], nc) Xn]
+		for i = eachindex(tnl)
+			S = [repeat(tnl[i:i], nc) Xn]
 			Yn[:, i] = predict(model, S)
 		end
 		Y = NMFk.denormalize(Yn, reshape(Xomin_interpolated(t), (1, ntimes)), reshape(Xomax_interpolated(t), (1, ntimes)))
