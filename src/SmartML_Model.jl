@@ -234,6 +234,8 @@ function model_col(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector
 	aimax = vec(Ximax)
 	aomin = vec(Xomin)
 	aomax = vec(Xomax)
+	Xomin_interpolated = Interpolations.CubicSplineInterpolation(times, aomin, extrapolation_bc=Interpolations.Line())
+	Xomax_interpolated = Interpolations.CubicSplineInterpolation(times, aomax, extrapolation_bc=Interpolations.Line())
 	function mlmodel(x::AbstractVector)
 		xn = first(NMFk.normalize(x; amin=aimin, amax=aimax))
 		if ntimes > 0
@@ -255,7 +257,7 @@ function model_col(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector
 		for i = eachindex(tn)
 			y[i] = first(predict(model, reshape([tn[i]; xn], (1, nparams1))))
 		end
-		NMFk.denormalize!(y, aomin, aomax)
+		NMFk.denormalize!(y, Xomin_interpolated(t), Xomax_interpolated(t))
 		return y
 	end
 	function mlmodel(X::AbstractMatrix)
@@ -271,7 +273,7 @@ function model_col(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector
 		else
 			Yn = predict(model, Xn)
 			Y = NMFk.denormalize(Yn, Xomin, Xomax)
-			Y = reshape(Y, nc, 1)
+			Y = reshape(Y, (nc, 1))
 		end
 		return Y
 	end
@@ -285,7 +287,7 @@ function model_col(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector
 			S = [repeat(tn[i:i], nc) Xn]
 			Yn[:, i] = predict(model, S)
 		end
-		Y = NMFk.denormalize(Yn, Xomin, Xomax)
+		Y = NMFk.denormalize(Yn, reshape(Xomin_interpolated(t), (1, ntimes)), reshape(Xomax_interpolated(t), (1, ntimes)))
 		return Y
 	end
 	r2t = SVR.r2(vy_tr[.!lpm], vy_pr[.!lpm])

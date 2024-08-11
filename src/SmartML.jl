@@ -13,6 +13,7 @@ import DelimitedFiles
 import Gadfly
 import JLD
 import Statistics
+import Interpolations
 
 smlmodel = Union{SVR.svmmodel, MLJ.Machine}
 
