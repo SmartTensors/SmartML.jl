@@ -158,7 +158,7 @@ function model_fully_transient(Xo::AbstractMatrix, Xi::AbstractMatrix, times::Ab
 	return mlmodel, model, y_pr, pm
 end
 
-function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vector(undef, 0), Xtn::AbstractMatrix=Matrix(undef, 0, 0); keepcases::BitArray=falses(size(Xo, 1)), modeltype::Symbol=:svr, ratio::Number=0, ptimes::Union{Vector{Integer},AbstractUnitRange}=1:length(times), plot::Bool=false, plottime::Bool=false, mask=Colon(), load::Bool=false, save::Bool=false, modeldir::AbstractString=joinpath(workdir, "model_$(modeltype)"), plotdir::AbstractString=joinpath(workdir, "figures_$(modeltype)"), case::AbstractString="", filename::AbstractString="", quiet::Bool=false, kw...)
+function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vector(undef, 0), Xtn::AbstractMatrix=Matrix(undef, 0, 0); keepcases::BitArray=falses(size(Xo, 1)), modeltype::Symbol=:svr, ratio::Number=0, ptimes::Union{Vector{Integer},AbstractUnitRange}=1:length(times), plot::Bool=false, plottime::Bool=false, mask=Colon(), load::Bool=false, save::Bool=false, modeldir::AbstractString=joinpath(workdir, "model_$(modeltype)"), plotdir::AbstractString=joinpath(workdir, "figures_$(modeltype)"), case::AbstractString="", filename::AbstractString="", quiet::Bool=false, xtitle::Union{AbstractString,Nothing}=:nothing, ytitle::Union{AbstractString,Nothing}=:nothing, kw...)
 	Mads.recursivemkdir(plotdir; filename=false)
 	inan = vec(.!isnan.(sum(Xo; dims=2))) .|| vec(.!isnan.(sum(Xi; dims=2)))
 	Xon, Xomin, Xomax, Xob = NMFk.normalizematrix_col(Xo[inan, :])
@@ -196,9 +196,9 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 		end
 	end
 	if plot && ntimes > 0
-		Mads.plotseries(Xo[.!pm, 1:ntimes]', "$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_training_series.png"; title="Training set ($(sum(.!pm)))", xaxis=times, xmin=0, xmax=times[end])
+		Mads.plotseries(Xo[.!pm, 1:ntimes]', "$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_training_series.png"; title="Training set ($(sum(.!pm)))", xaxis=times, xmin=0, xmax=times[end], xtitle=xtitle, ytitle=ytitle)
 		if sum(pm) > 0
-			Mads.plotseries(Xo[pm, 1:ntimes]', "$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_validation_series.png"; title="Validation set ($(sum(pm)))", xaxis=times, xmin=0, xmax=times[end])
+			Mads.plotseries(Xo[pm, 1:ntimes]', "$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_validation_series.png"; title="Validation set ($(sum(pm)))", xaxis=times, xmin=0, xmax=times[end], xtitle=xtitle, ytitle=ytitle)
 		end
 	end
 	if (load || save) && (filename != "" || case != "")
@@ -307,11 +307,11 @@ function model(Xo::AbstractMatrix, Xi::AbstractMatrix, times::AbstractVector=Vec
 	end
 	if plot
 		Mads.plotseries([vy_tr vy_pr], "$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_series.png"; xmin=1, xmax=length(vy_pr), logy=false, names=["Truth", "Prediction"])
-		NMFk.plotscatter(vy_tr[.!lpm], vy_pr[.!lpm]; title="Training Size: $(sum(.!pm)); r<sup>2</sup>: $(round(r2t; sigdigits=3)); RMSE: $(round(rmset; sigdigits=3))", xtitle="True", ytitle="Estimate", filename="$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_scatter_training.png")
+		NMFk.plotscatter(vy_tr[.!lpm], vy_pr[.!lpm]; title="Training Size: $(sum(.!pm)); r<sup>2</sup>: $(round(r2t; sigdigits=3)); RMSE: $(round(rmset; sigdigits=3))", xtitle="Truth", ytitle="Prediction", filename="$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_scatter_training.png")
 
 	end
 	if plot && sum(lpm) > 0
-		NMFk.plotscatter(vy_tr[lpm], vy_pr[lpm]; title="Validation Size: $(sum(pm)); r<sup>2</sup>: $(round(r2p; sigdigits=3)); RMSE: $(round(rmsep; sigdigits=3))", xtitle="True", ytitle="Estimate", filename="$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_scatter_validation.png")
+		NMFk.plotscatter(vy_tr[lpm], vy_pr[lpm]; title="Validation Size: $(sum(pm)); r<sup>2</sup>: $(round(r2p; sigdigits=3)); RMSE: $(round(rmsep; sigdigits=3))", xtitle="Truth", ytitle="Prediction", filename="$(plotdir)/$(case)_$(ncases)_$(ncases - sum(pm))_$(sum(pm))_scatter_validation.png")
 	end
 	if ntimes > 0
 		y_pr = reshape(vy_pr, ncases, ntimes)
