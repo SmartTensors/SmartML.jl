@@ -12,6 +12,7 @@ import Suppressor
 import DelimitedFiles
 import Gadfly
 import JLD
+import OrderedCollections
 import Statistics
 import Interpolations
 

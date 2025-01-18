@@ -41,7 +41,7 @@ function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio_prediction::Number
 	y_pr = XGBoost.predict(model, x)
 	@info("Root mean square error (all       ): $(MLJ.rmse(y, y_pr))")
 	@info("Root mean square error (training  ): $(MLJ.rmse(y[.!mask_prediction], y_pr[.!mask_prediction]))")
-	@info("Root mean square error (prediction): $(MLJ.rmse(y[mask_prediction], y_pr[mask_prediction]))")
+	sum(mask_prediction) > 0 && @info("Root mean square error (prediction): $(MLJ.rmse(y[mask_prediction], y_pr[mask_prediction]))")
 	return y_pr, mask_prediction, model
 end
 
@@ -74,11 +74,13 @@ function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio_prediction::Number
 	end
 	@info("Root mean square error (all       ): $(MLJ.rmse(y, y_pr))")
 	@info("Root mean square error (training  ): $(MLJ.rmse(y[.!mask_prediction], y_pr[.!mask_prediction]))")
-	@info("Root mean square error (prediction): $(MLJ.rmse(y[mask_prediction], y_pr[mask_prediction]))")
+	sum(mask_prediction) > 0 && @info("Root mean square error (prediction): $(MLJ.rmse(y[mask_prediction], y_pr[mask_prediction]))")
 	return y_pr, mask_prediction, model
 end
 
-function mljmodel(y::AbstractVector, x::AbstractMatrix; ratio_prediction::Number=0.0, keepcases::BitArray=falses(length(y)), mask_prediction::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filename::AbstractString="", quiet::Bool=true, MLJmodel::DataType=MLJXGBoostInterface.XGBoostRegressor, ml_verbosity::Integer=0, self_tuning::Bool=false, kw...)
+function mljmodel(y::AbstractVector, x::AbstractMatrix; ratio_prediction::Number=0.0, keepcases::BitArray=falses(length(y)), mask_prediction::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filename::AbstractString="", quiet::Bool=true, ntries::Number=10, nfolds::Number=5, ml_verbosity::Integer=0, self_tuning::Bool=false,
+		ranges::AbstractDict{Symbol,Vector}=OrderedCollections.OrderedDict(:max_depth => [3, 5, 6, 10, 15, 20], :eta => [0.01, 0.1, 0.2, 0.3], :subsample => collect(0.5:0.1:1.0), :colsample_bytree => collect(0.4:0.1:1.0), :colsample_bylevel => collect(0.4:0.1:1.0), :colsample_bynode => collect(0.4:0.1:1.0), :num_round => [100, 500, 1000]),
+		model::Any=MLJXGBoostInterface.XGBoostRegressor(; test=1, num_round=ntries, booster="gbtree", disable_default_eval_metric=0, eta=0.01, num_parallel_tree=1, gamma=0.0, max_depth=15, min_child_weight=1.0, max_delta_step=0.0, subsample=1.0, colsample_bytree=0.5, colsample_bylevel=0.4, colsample_bynode=1.0, lambda=1.0, alpha=0.0, tree_method="auto", sketch_eps=0.03, scale_pos_weight=1.0, updater=nothing, refresh_leaf=1, process_type="default", grow_policy="depthwise", max_leaves=0, max_bin=256, predictor="cpu_predictor", sample_type="uniform", normalize_type="tree", rate_drop=0.0, one_drop=0, skip_drop=0.0, feature_selector="cyclic", top_k=0, tweedie_variance_power=1.5, objective="reg:squarederror", base_score=0.5, watchlist=nothing, nthread=16, importance_type="gain", seed=nothing, validate_parameters=false, eval_metric=String[]))
 	if isnothing(mask_prediction)
 		mask_prediction = SVR.get_prediction_mask(length(y), ratio_prediction; keepcases=keepcases, debug=true)
 	else
@@ -92,33 +94,33 @@ function mljmodel(y::AbstractVector, x::AbstractMatrix; ratio_prediction::Number
 		mlj_machine = MLJ.machine(filename)
 	else
 		if self_tuning
-			!quiet && @info("Self-Tuning & Training ...")
-			r_max_depth = MLJ.range(MLJmodel(), :max_depth; values=[3, 5, 6, 10, 15, 20])
-			r_eta = MLJ.range(MLJmodel(), :eta; values=[0.01, 0.1, 0.2, 0.3])
-			r_subsample = MLJ.range(MLJmodel(), :subsample; values=collect(0.5:0.1:1.0))
-			r_colsample_bytree = MLJ.range(MLJmodel(), :colsample_bytree; values=collect(0.4:0.1:1.0))
-			r_colsample_bylevel = MLJ.range(MLJmodel(), :colsample_bylevel; values=collect(0.4:0.1:1.0))
-			r_num_round = MLJ.range(MLJmodel(), :num_round; values=[100, 500, 1000])
-			range_v = [r_max_depth, r_eta, r_subsample, r_colsample_bytree, r_colsample_bylevel, r_num_round]
-			self_tuning_mljmodel = MLJ.TunedModel(model=MLJmodel(), resampling=MLJ.CV(nfolds=5), tuning=MLJ.RandomSearch(), range=range_v, measure=MLJ.rmse)
-			mlj_machine = MLJ.machine(self_tuning_mljmodel, MLJ.table(x[.!mask_prediction,:]), y[.!mask_prediction])
+			@info("Self-Tuning & Training ...")
+			ranges_vector = []
+			for k in keys(ranges)
+				push!(ranges_vector, MLJ.range(model, k; values=ranges[k]))
+				@info("Parameter $(k): range = $(ranges[k])")
+			end
+			self_tuning_model = MLJ.TunedModel(; model=model, n=ntries, resampling=MLJ.CV(; nfolds=nfolds), tuning=MLJ.RandomSearch(), range=ranges_vector, measure=MLJ.rmse, compact_history=true)
+			mlj_machine = MLJ.machine(self_tuning_model, MLJ.table(x[.!mask_prediction,:]), y[.!mask_prediction])
 			MLJ.fit!(mlj_machine; verbosity=ml_verbosity)
+			for k in keys(ranges)
+				@info("Parameter $(k): range = $(ranges[k]) => estimate = $(getproperty(MLJ.fitted_params(mlj_machine).best_model, k))")
+			end
 		else
 			!quiet && @info("Training ...")
-			mljmodel = MLJmodel(test=1, num_round=1000, booster="gbtree", disable_default_eval_metric=0, eta=0.01, num_parallel_tree=1, gamma=0.0, max_depth=15, min_child_weight=1.0, max_delta_step=0.0, subsample=1.0, colsample_bytree=0.5, colsample_bylevel=0.4, colsample_bynode=1.0, lambda=1.0, alpha=0.0, tree_method="auto", sketch_eps=0.03, scale_pos_weight=1.0, updater=nothing, refresh_leaf=1, process_type="default", grow_policy="depthwise", max_leaves=0, max_bin=256, predictor="cpu_predictor", sample_type="uniform", normalize_type="tree", rate_drop=0.0, one_drop=0, skip_drop=0.0, feature_selector="cyclic", top_k=0, tweedie_variance_power=1.5, objective="reg:squarederror", base_score=0.5, watchlist=nothing, nthread=16, importance_type="gain", seed=nothing, validate_parameters=false, eval_metric=String[])
-			mlj_machine = MLJ.machine(mljmodel, MLJ.table(x[.!mask_prediction,:]), y[.!mask_prediction])
+			mlj_machine = MLJ.machine(model, MLJ.table(x[.!mask_prediction,:]), y[.!mask_prediction])
 			MLJ.fit!(mlj_machine; verbosity=ml_verbosity)
 		end
 		if save && filename != ""
 			@info("Saving MLJ model to file: $(filename)")
 			Mads.recursivemkdir(filename; filename=true)
-			MLJ.save(filename, xgb_machine_fit)
+			MLJ.save(filename, mlj_machine)
 		end
 	end
 	y_pr = MLJ.predict(mlj_machine, MLJ.table(x))
 	@info("Root mean square error (all       ): $(MLJ.rmse(y, y_pr))")
 	@info("Root mean square error (training  ): $(MLJ.rmse(y[.!mask_prediction], y_pr[.!mask_prediction]))")
-	@info("Root mean square error (prediction): $(MLJ.rmse(y[mask_prediction], y_pr[mask_prediction]))")
+	sum(mask_prediction) > 0 && @info("Root mean square error (prediction): $(MLJ.rmse(y[mask_prediction], y_pr[mask_prediction]))")
 	return y_pr, mask_prediction, mlj_machine
 end
 
