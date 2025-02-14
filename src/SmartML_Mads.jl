@@ -97,7 +97,7 @@ function emcee(md::AbstractDict=Dict(); parammin::AbstractArray=Vector{Float32}(
 	end
 	t = Mads.getobstime(md)
 	DelimitedFiles.writedlm(f_emcee_pi, [t o], ',')
-	ofs = [Mads.of(md, o[:,i]) for i=1:size(o, 2)]
+	ofs = [Mads.of(md, o[:,i]) for i=axes(o, 2)]
 	iofs = sortperm(ofs)
 	paramkey = Mads.getparamkeys(md)
 	ptype = Mads.getparamstype(md)
@@ -149,7 +149,7 @@ function emcee(md::AbstractDict=Dict(); parammin::AbstractArray=Vector{Float32}(
 	DelimitedFiles.writedlm(f_emcee_parameters, chain, ',')
 	if sum(sofs) > 0 && length(paramkey[iopt]) == size(chain, 1)
 		@info("Average/min/max parameters for the AffineInvariantMCMC predictions with errors less than $(ofmax): $(sum(sofs)) out of $(length(ofs)) in total ...:")
-		ps = [paramkey[iopt] vcat([hcat(Statistics.mean(chain[i, sofs]), minimum(chain[i, sofs]), maximum(chain[i, sofs])) for i=1:size(chain, 1)]...)]
+		ps = [paramkey[iopt] vcat([hcat(Statistics.mean(chain[i, sofs]), minimum(chain[i, sofs]), maximum(chain[i, sofs])) for i=axes(chain, 1)]...)]
 		display(ps)
 		println()
 		DelimitedFiles.writedlm(f_emcee_parameters_mean, ps, ',')
