@@ -21,7 +21,7 @@ function sensitivity(Xon::AbstractMatrix, Xin::AbstractMatrix, times::AbstractVe
 	end
 end
 
-function analysis_eachtime(Xon::AbstractMatrix, Xin::AbstractMatrix, times::AbstractVector, keepcases::BitArray=falses(size(Xon, 1)); modeltype::Symbol=:svr, ptimes::AbstractUnitRange=1:length(times), plot::Bool=false, trainingrange::AbstractVector=[0.0, 0.05, 0.1, 0.2, 0.33], epsilon::Float64=0.000000001, gamma::Float64=0.1, nreruns::Int64=10, mask=Colon())
+function analysis_eachtime(Xon::AbstractMatrix, Xin::AbstractMatrix, times::AbstractVector, keepcases::BitArray=falses(size(Xon, 1)); modeltype::Symbol=:svr, ptimes::AbstractUnitRange=eachindex(times), plot::Bool=false, trainingrange::AbstractVector=[0.0, 0.05, 0.1, 0.2, 0.33], epsilon::Float64=0.000000001, gamma::Float64=0.1, nreruns::Int64=10, mask=Colon())
 	ntimes = length(times)
 	ncases = size(Xin, 1)
 	vcountt = Vector{Int64}(undef, 0)
@@ -98,7 +98,7 @@ function analysis_eachtime(Xon::AbstractMatrix, Xin::AbstractMatrix, times::Abst
 	return vcountt, vcountp, vr2t, vr2p
 end
 
-function analysis_transient(Xon::AbstractMatrix, Xin::AbstractMatrix, times::AbstractVector, keepcases::BitArray, Xtn::AbstractMatrix=Matrix(undef, 0, 0); modeltype::Symbol=:svr, ptimes::Union{Vector{Integer},AbstractUnitRange}=1:length(times), plot::Bool=false, plottime::Bool=plot, trainingrange::AbstractVector=[0.0, 0.05, 0.1, 0.2, 0.33], epsilon::Float64=0.000000001, gamma::Float64=0.1, nreruns::Int64=10, mask=Colon())
+function analysis_transient(Xon::AbstractMatrix, Xin::AbstractMatrix, times::AbstractVector, keepcases::BitArray, Xtn::AbstractMatrix=Matrix(undef, 0, 0); modeltype::Symbol=:svr, ptimes::Union{Vector{Integer},AbstractUnitRange}=eachindex(times), plot::Bool=false, plottime::Bool=plot, trainingrange::AbstractVector=[0.0, 0.05, 0.1, 0.2, 0.33], epsilon::Float64=0.000000001, gamma::Float64=0.1, nreruns::Int64=10, mask=Colon())
 	ntimes = length(times)
 	ncases = size(Xin, 1)
 	vcountt = Vector{Int64}(undef, 0)
