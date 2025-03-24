@@ -141,7 +141,7 @@ function compute_clusters!(smarttensors_model::DataModel)
 	else
 		labels = ["w$i" for i in axes(W, 1)]
 	end
-	@show labels
+	@info("Labels = $(labels)")
 	im = ismissing.(data)
 	data[im] .= NaN
 	data = float.(data)
