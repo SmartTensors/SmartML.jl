@@ -1,4 +1,5 @@
 function fluxmodel(y::AbstractVector, x::AbstractMatrix; ratio_prediction::Number=0.0, keepcases::BitArray=falses(length(y)), mask_prediction::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, check::Bool=false, load::Bool=false, save::Bool=false, filename::AbstractString="", quiet::Bool=false, kw...)
+	throw(ArgumentError("SmartML.fluxmodel is not implemented yet. Use `modeltype=:svr`, `:xgb`, or `:mlj` (or contribute an implementation)."))
 end
 
 function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio_prediction::Number=0.0, keepcases::BitArray=falses(length(y)), mask_prediction::Union{AbstractVector,Nothing}=nothing, normalize::Bool=true, scale::Bool=true, load::Bool=false, save::Bool=false, filename::AbstractString="", quiet::Bool=false, kw...)
@@ -28,7 +29,7 @@ function xgbmodel(y::AbstractVector, x::AbstractMatrix; ratio_prediction::Number
 			:colsample_bylevel => 0.6,
 			:seed => 20,
 			:min_child_weight => 1,
-			:reg_alpha => 0,y_p
+			:reg_alpha => 0,
 			:reg_lambda => 1,
 			:n_estimators => 1000)
 		model = XGBoost.xgboost(x[.!mask_prediction, :], 20; label=y[.!mask_prediction], verbose=0, silent=1, param_dict...)
@@ -70,7 +71,7 @@ function svrmodel(y::AbstractVector, x::AbstractMatrix; ratio_prediction::Number
 	y_pr = SVR.predict(model, xt)
 	if check
 		y_pr2, _, _ = SVR.fit_test(y, xt; ratio_prediction=ratio_prediction, quiet=true, mask_prediction=mask_prediction, keepcases=keepcases, epsilon=epsilon, gamma=gamma, kw...)
-		@assert vy_pr == vy_pr2
+		@assert y_pr == y_pr2
 	end
 	@info("Root mean square error (all       ): $(MLJ.rmse(y, y_pr))")
 	@info("Root mean square error (training  ): $(MLJ.rmse(y[.!mask_prediction], y_pr[.!mask_prediction]))")

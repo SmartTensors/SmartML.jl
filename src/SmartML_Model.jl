@@ -126,11 +126,11 @@ function model_fully_transient(Xo::AbstractMatrix, Xi::AbstractMatrix, times::Ab
 	end
 	r2t = SVR.r2(vy_tr[.!lpm], vy_pr[.!lpm])
 	rmset = NMFk.rmsenan(vy_tr[.!lpm], vy_pr[.!lpm])
-	!quiet && println("Training $(ncases - sum(pm)) / $(sum(pm)) $(ratio) r2 = $(round(r2t; sigdigits=3)) rmse = $(round(rmset; sigdigits=3))")
+	!quiet && @info("Training $(ncases - sum(pm)) / $(sum(pm)) $(ratio) r2 = $(round(r2t; sigdigits=3)) rmse = $(round(rmset; sigdigits=3))")
 	if sum(lpm) > 0
 		r2p = SVR.r2(vy_tr[lpm], vy_pr[lpm])
 		rmsep = NMFk.rmsenan(vy_tr[lpm], vy_pr[lpm])
-		!quiet && println("Validation $(ncases - sum(pm)) / $(sum(pm)) $(ratio) r2 = $(round(r2p; sigdigits=3)) rmse = $(round(rmsep; sigdigits=3))")
+		!quiet && @info("Validation $(ncases - sum(pm)) / $(sum(pm)) $(ratio) r2 = $(round(r2p; sigdigits=3)) rmse = $(round(rmsep; sigdigits=3))")
 	else
 		r2p = rmsep = NaN
 	end

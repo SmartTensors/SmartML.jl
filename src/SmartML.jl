@@ -19,11 +19,14 @@ import Interpolations
 smlmodel = Union{SVR.svmmodel, MLJ.Machine}
 
 const smartmldir = Base.pkgdir(SmartML)
-workdir = smartmldir
+workdir::String = smartmldir
 
 function setworkdir(dirname::AbstractString)
-	global workdir = dirname
+	global workdir = String(dirname)
+	return workdir
 end
+
+setworkdir!(dirname::AbstractString) = setworkdir(dirname)
 
 include("SmartML_Data.jl")
 include("SmartML_Models.jl")
